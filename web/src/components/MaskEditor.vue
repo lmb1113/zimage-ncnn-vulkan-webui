@@ -2,8 +2,9 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 
 // MaskEditor：局部重绘的手绘蒙版编辑器。
-// 在原图上用半透明红色画笔涂抹，提交时由 exportMask() 按原图分辨率
-// 导出黑底白笔的蒙版 PNG（白=重绘，黑=保留），与引擎 -k 参数约定一致。
+// 支持滚轮缩放（以光标为中心）、移动工具平移；笔画坐标全部存图片原始像素，
+// 缩放/平移/窗口尺寸变化都不会让笔迹漂移。提交时由 exportMask() 按原图分辨率
+// 导出黑底白笔蒙版（白=重绘，黑=保留），与引擎 -k 参数约定一致。
 const props = defineProps({
   src: { type: String, required: true },
 })
@@ -12,21 +13,84 @@ const wrap = ref(null)
 const baseCanvas = ref(null)
 const maskCanvas = ref(null)
 const brushSize = ref(30)
-const tool = ref('brush') // brush | erase
-const strokes = ref([]) // { points: [{x,y}], size, erase }，坐标为显示像素
+const tool = ref('brush') // brush | erase | pan
+const zoomPct = ref(100)
+const strokes = ref([]) // { points:[{x,y}], size, erase }，坐标与 size 均为图片原始像素
 
 let img = new Image()
 let drawing = false
+let panning = false
+let panStart = null // { x, y, panX, panY }
 let current = null
 let ro = null
+
+const MIN_ZOOM = 1
+const MAX_ZOOM = 8
+
+// ---------- 视图状态 ----------
+
+let baseW = 0 // 适应宽度（容器宽）
+let zoom = 1
+let panX = 0
+let panY = 0
+
+function clampPan() {
+  const w = wrap.value ? wrap.value.clientWidth : 0
+  const h = Math.round((w * img.naturalHeight) / img.naturalWidth) || 0
+  const vw = w * zoom
+  const vh = h * zoom
+  panX = vw <= w ? (w - vw) / 2 : Math.min(0, Math.max(w - vw, panX))
+  panY = vh <= h ? (h - vh) / 2 : Math.min(0, Math.max(h - vh, panY))
+}
+
+function setZoom(z, cx, cy) {
+  const old = zoom
+  z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z))
+  if (z === old) return
+  // 以 (cx, cy) 为焦点缩放
+  panX = cx - ((cx - panX) * z) / old
+  panY = cy - ((cy - panY) * z) / old
+  zoom = z
+  clampPan()
+  zoomPct.value = Math.round(zoom * 100)
+  redrawAll()
+}
+
+function resetView() {
+  zoom = 1
+  panX = 0
+  panY = 0
+  zoomPct.value = 100
+  redrawAll()
+}
+
+// 屏幕坐标 → 图片原始像素
+function toNatural(clientX, clientY) {
+  const r = maskCanvas.value.getBoundingClientRect()
+  const sx = clientX - r.left
+  const sy = clientY - r.top
+  const k = img.naturalWidth / baseW
+  return {
+    x: ((sx - panX) / zoom) * k,
+    y: ((sy - panY) / zoom) * k,
+  }
+}
+
+// ---------- 绘制 ----------
 
 function redrawBase() {
   const c = baseCanvas.value
   if (!c || !wrap.value || !img.width) return
-  c.width = wrap.value.clientWidth
-  c.height = Math.round((c.width * img.naturalHeight) / img.naturalWidth)
+  baseW = wrap.value.clientWidth
+  c.width = baseW
+  c.height = Math.round((baseW * img.naturalHeight) / img.naturalWidth)
   const ctx = c.getContext('2d')
-  ctx.drawImage(img, 0, 0, c.width, c.height)
+  ctx.setTransform(zoom, 0, 0, zoom, panX, panY)
+  ctx.drawImage(img, 0, 0, baseW, baseH())
+}
+
+function baseH() {
+  return Math.round((baseW * img.naturalHeight) / img.naturalWidth)
 }
 
 function redrawMask() {
@@ -36,56 +100,67 @@ function redrawMask() {
   c.width = base.width
   c.height = base.height
   const ctx = c.getContext('2d')
+  // 笔迹存的是原始像素：变换 = 平移 × (zoom × 适应比例)
+  const s = img.naturalWidth / baseW
+  ctx.setTransform(zoom * s, 0, 0, zoom * s, panX, panY)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  for (const s of strokes.value) {
-    // 橡皮：把已涂的红色擦掉（导出时按黑色处理）
-    ctx.globalCompositeOperation = s.erase ? 'destination-out' : 'source-over'
+  for (const st of strokes.value) {
+    ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
     ctx.strokeStyle = 'rgba(255, 86, 86, 0.7)'
     ctx.fillStyle = 'rgba(255, 86, 86, 0.7)'
-    ctx.lineWidth = s.size
+    ctx.lineWidth = st.size
     ctx.beginPath()
-    s.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+    st.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
     ctx.stroke()
-    if (s.points.length === 1) {
+    if (st.points.length === 1) {
       ctx.beginPath()
-      ctx.arc(s.points[0].x, s.points[0].y, s.size / 2, 0, Math.PI * 2)
+      ctx.arc(st.points[0].x, st.points[0].y, st.size / 2, 0, Math.PI * 2)
       ctx.fill()
     }
   }
   ctx.globalCompositeOperation = 'source-over'
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+}
+
+function redrawAll() {
+  redrawBase()
+  redrawMask()
 }
 
 function setup() {
-  redrawBase()
-  redrawMask()
+  redrawAll()
 }
 
 function load() {
   img = new Image()
   img.onload = () => {
     strokes.value = []
-    setup()
+    resetView()
   }
   img.src = props.src
 }
 
-function pos(e) {
-  const r = maskCanvas.value.getBoundingClientRect()
-  return { x: e.clientX - r.left, y: e.clientY - r.top }
-}
+// ---------- 交互 ----------
 
 function down(e) {
   e.preventDefault()
+  if (tool.value === 'pan') {
+    panning = true
+    panStart = { x: e.clientX, y: e.clientY, panX, panY }
+    return
+  }
   try {
     maskCanvas.value.setPointerCapture(e.pointerId)
   } catch (err) {
     /* 合成事件或指针已释放时忽略 */
   }
   drawing = true
+  const p = toNatural(e.clientX, e.clientY)
+  const k = img.naturalWidth / baseW
   current = {
-    points: [pos(e)],
-    size: Number(brushSize.value),
+    points: [p],
+    size: (Number(brushSize.value) * k) / zoom,
     erase: tool.value === 'erase',
   }
   strokes.value.push(current)
@@ -93,15 +168,34 @@ function down(e) {
 }
 
 function move(e) {
+  if (panning) {
+    panX = panStart.panX + (e.clientX - panStart.x)
+    panY = panStart.panY + (e.clientY - panStart.y)
+    clampPan()
+    redrawAll()
+    return
+  }
   if (!drawing) return
   e.preventDefault()
-  current.points.push(pos(e))
+  current.points.push(toNatural(e.clientX, e.clientY))
   redrawMask()
 }
 
 function up() {
   drawing = false
+  panning = false
   current = null
+}
+
+function onWheel(e) {
+  if (!maskCanvas.value) return
+  e.preventDefault()
+  const r = maskCanvas.value.getBoundingClientRect()
+  setZoom(
+    zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2),
+    e.clientX - r.left,
+    e.clientY - r.top
+  )
 }
 
 function undo() {
@@ -126,40 +220,23 @@ async function exportMask() {
   const ctx = c.getContext('2d')
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, c.width, c.height)
-  const k = img.naturalWidth / baseCanvas.value.width
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  for (const s of strokes.value) {
-    ctx.strokeStyle = s.erase ? '#000' : '#fff'
-    ctx.fillStyle = s.erase ? '#000' : '#fff'
-    ctx.lineWidth = s.size * k
+  for (const st of strokes.value) {
+    ctx.strokeStyle = st.erase ? '#000' : '#fff'
+    ctx.fillStyle = st.erase ? '#000' : '#fff'
+    ctx.lineWidth = st.size
     ctx.beginPath()
-    s.points.forEach((p, i) =>
-      i ? ctx.lineTo(p.x * k, p.y * k) : ctx.moveTo(p.x * k, p.y * k)
-    )
+    st.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
     ctx.stroke()
-    if (s.points.length === 1) {
+    if (st.points.length === 1) {
       ctx.beginPath()
-      ctx.arc(s.points[0].x * k, s.points[0].y * k, (s.size * k) / 2, 0, Math.PI * 2)
+      ctx.arc(st.points[0].x, st.points[0].y, st.size / 2, 0, Math.PI * 2)
       ctx.fill()
     }
   }
   const blob = await new Promise((r) => c.toBlob(r, 'image/png'))
   return new File([blob], 'mask.png', { type: 'image/png' })
-}
-
-function onKey(e) {
-  // 焦点在输入框时不拦截
-  const tag = (e.target && e.target.tagName) || ''
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-    e.preventDefault()
-    undo()
-  } else if (e.key === '[') {
-    brushSize.value = Math.max(6, Number(brushSize.value) - 4)
-  } else if (e.key === ']') {
-    brushSize.value = Math.min(120, Number(brushSize.value) + 4)
-  }
 }
 
 watch(() => props.src, load)
@@ -174,6 +251,20 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
 })
 
+// 快捷键：Ctrl+Z 撤销、[ / ] 调笔刷（输入框聚焦时不拦截）
+function onKey(e) {
+  const tag = (e.target && e.target.tagName) || ''
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault()
+    undo()
+  } else if (e.key === '[') {
+    brushSize.value = Math.max(6, Number(brushSize.value) - 4)
+  } else if (e.key === ']') {
+    brushSize.value = Math.min(120, Number(brushSize.value) + 4)
+  }
+}
+
 defineExpose({ hasStrokes, exportMask, clear })
 </script>
 
@@ -187,14 +278,19 @@ defineExpose({ hasStrokes, exportMask, clear })
         <button class="tbtn" :class="{ on: tool === 'erase' }" @click="tool = 'erase'">
           橡皮
         </button>
+        <button class="tbtn" :class="{ on: tool === 'pan' }" title="拖动平移画面" @click="tool = 'pan'">
+          移动
+        </button>
       </div>
       <div class="size">
         <span class="slabel">笔刷</span>
         <input v-model.number="brushSize" type="range" min="6" max="120" step="2" />
       </div>
       <div class="tools">
+        <span class="zoom-label">{{ zoomPct }}%</span>
         <button class="tbtn" :disabled="!strokes.length" @click="undo">撤销</button>
         <button class="tbtn" :disabled="!strokes.length" @click="clear">清空</button>
+        <button class="tbtn" :disabled="zoomPct === 100" @click="resetView">适应</button>
       </div>
     </div>
 
@@ -203,13 +299,17 @@ defineExpose({ hasStrokes, exportMask, clear })
       <canvas
         ref="maskCanvas"
         class="mask"
+        :class="{ pan: tool === 'pan' }"
         @pointerdown="down"
         @pointermove="move"
         @pointerup="up"
         @pointercancel="up"
+        @wheel="onWheel"
       />
     </div>
-    <p class="mhint">在图上涂抹需要重绘的区域（红色），提交时自动生成蒙版。快捷键：Ctrl+Z 撤销、[ / ] 调笔刷</p>
+    <p class="mhint">
+      涂抹需要重绘的区域（红色），提交时自动生成蒙版。滚轮缩放、移动工具平移；Ctrl+Z 撤销、[ / ] 调笔刷
+    </p>
   </div>
 </template>
 
@@ -229,6 +329,7 @@ defineExpose({ hasStrokes, exportMask, clear })
 .tools {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 .tbtn {
   padding: 6px 10px;
@@ -246,6 +347,13 @@ defineExpose({ hasStrokes, exportMask, clear })
 .tbtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+.zoom-label {
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: center;
 }
 .size {
   display: flex;
@@ -270,6 +378,7 @@ defineExpose({ hasStrokes, exportMask, clear })
   border-radius: var(--r-md);
   overflow: hidden;
   line-height: 0;
+  background: var(--tint);
 }
 .cwrap canvas {
   display: block;
@@ -280,6 +389,9 @@ defineExpose({ hasStrokes, exportMask, clear })
   inset: 0;
   cursor: crosshair;
   touch-action: none;
+}
+.mask.pan {
+  cursor: grab;
 }
 .mhint {
   margin: 0;
