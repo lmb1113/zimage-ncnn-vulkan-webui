@@ -6,6 +6,7 @@ import MaskEditor from './MaskEditor.vue'
 
 const modes = [
   { key: 'txt2img', label: '文生图' },
+  { key: 'img2img', label: '图生图' },
   { key: 'inpaint', label: '局部重绘' },
   { key: 'outpaint', label: '画布扩图' },
   { key: 'controlnet', label: 'ControlNet' },
@@ -66,8 +67,8 @@ async function uploadFile(file, key) {
     const r = await api.upload(file)
     params[key] = r.path
     previews[key] = r.url
-    // 局部重绘的输入图：输出尺寸自动对齐原图，避免引擎尺寸冲突
-    if (key === 'inputImage') syncInputSize(r.url)
+    // 输入图 / 参考图：输出尺寸自动对齐原图，避免引擎尺寸冲突
+    if (key === 'inputImage' || key === 'controlImage') syncInputSize(r.url)
     notify(`已上传 ${file.name}`, 'success')
   } catch (e) {
     notify(e.message, 'error')
@@ -129,7 +130,8 @@ async function submit() {
   const payload = { ...params }
   if (mode.value === 'tile') payload.tileUpscale = true
   try {
-    await api.generate(mode.value, payload)
+    // 图生图 = ControlNet 路线：引擎无原生 img2img，用 -c 参考图实现
+    await api.generate(mode.value === 'img2img' ? 'controlnet' : mode.value, payload)
     notify('任务已提交')
   } catch (e) {
     notify(e.message, 'error')
@@ -244,7 +246,7 @@ function reset() {
       <input v-model="params.outpaint" placeholder="128,128,128,128" />
     </div>
 
-    <div v-else-if="mode === 'controlnet' || mode === 'tile'" class="group">
+    <div v-else-if="mode === 'controlnet' || mode === 'tile' || mode === 'img2img'" class="group">
       <button
         class="uploader"
         title="点击选择或拖入图片"
@@ -254,11 +256,17 @@ function reset() {
       >
         <img v-if="previews.controlImage" :src="previews.controlImage" alt="" />
         <span v-else>{{
-          mode === 'tile' ? '上传低分辨率图 · -c -t' : '上传控制图（姿态/线稿/灰度）'
+          mode === 'tile'
+            ? '上传低分辨率图 · -c -t'
+            : mode === 'img2img'
+              ? '上传参考图 · -c（可拖入）'
+              : '上传控制图（姿态/线稿/灰度）'
         }}</span>
       </button>
       <div class="row-between">
-        <span class="field-label">控制强度 · -w</span>
+        <span class="field-label">
+          {{ mode === 'img2img' ? '相似强度 · -w' : '控制强度 · -w' }}
+        </span>
         <span class="value">{{ params.controlScale.toFixed(2) }}</span>
       </div>
       <input
@@ -268,6 +276,9 @@ function reset() {
         max="2"
         step="0.05"
       />
+      <p v-if="mode === 'img2img'" class="i2i-hint">
+        通过 ControlNet 实现图生图：结果跟随参考图的结构与构图。相似强度越高越接近原图，越低 AI 发挥越大；配合提示词描述想要的画面。
+      </p>
     </div>
 
     <div class="group params">
@@ -530,6 +541,12 @@ function reset() {
   font-size: 12px;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
+}
+.i2i-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
 }
 .spacer {
   flex: 1 0 auto;

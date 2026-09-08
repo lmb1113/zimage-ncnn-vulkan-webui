@@ -10,7 +10,7 @@ const modeLabels = {
   txt2img: '文生图',
   inpaint: '局部重绘',
   outpaint: '画布扩图',
-  controlnet: 'ControlNet',
+  controlnet: '图生图 / ControlNet',
   tile: 'Tile 放大',
 }
 
