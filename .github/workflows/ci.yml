@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 构建前端
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: 单元测试
+        run: go test ./... -v
+
+      - name: 编译（嵌入前端产物）
+        run: go build -trimpath -ldflags "-s -w" -o zimage-webui.exe .
+
+      - name: 交叉编译 Linux / macOS
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          $env:CGO_ENABLED = "0"
+          $env:GOOS = "linux"; $env:GOARCH = "amd64"
+          go build -trimpath -ldflags "-s -w" -o dist/zimage-webui-linux-amd64 .
+          $env:GOARCH = "arm64"
+          go build -trimpath -ldflags "-s -w" -o dist/zimage-webui-linux-arm64 .
+          $env:GOOS = "darwin"; $env:GOARCH = "arm64"
+          go build -trimpath -ldflags "-s -w" -o dist/zimage-webui-darwin-arm64 .
+          $env:GOARCH = "amd64"
+          go build -trimpath -ldflags "-s -w" -o dist/zimage-webui-darwin-amd64 .
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: zimage-webui
+          path: |
+            zimage-webui.exe
+            dist/*
+          if-no-files-found: ignore
+
+      - name: 发布 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            zimage-webui.exe
+            dist/*
+          generate_release_notes: true

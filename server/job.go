@@ -27,7 +27,7 @@ type Params struct {
 	Seed         int64   `json:"seed"`   // -1 = 随机
 	Batch        int     `json:"batch"`  // -b
 	ModelPath    string  `json:"modelPath"`
-	GPUID        int     `json:"gpuId"`  // -2 自动 / -1 CPU / >=0 指定设备
+	GPUID        *int    `json:"gpuId"` // nil 自动 / -1 CPU / >=0 指定设备；指针用于区分「未设置」与显式 GPU 0
 	InputImage   string  `json:"inputImage"`   // -i
 	MaskImage    string  `json:"maskImage"`    // -k
 	Outpaint     string  `json:"outpaint"`     // -x l,t,r,b
@@ -362,8 +362,8 @@ func BuildArgs(j *Job, outPath string) []string {
 	if strings.TrimSpace(p.ModelPath) != "" {
 		a = append(a, "-m", strings.TrimSpace(p.ModelPath))
 	}
-	if p.GPUID != -2 {
-		a = append(a, "-g", strconv.Itoa(p.GPUID))
+	if p.GPUID != nil && *p.GPUID != -2 {
+		a = append(a, "-g", strconv.Itoa(*p.GPUID))
 	}
 	if p.Batch > 1 {
 		a = append(a, "-b", strconv.Itoa(p.Batch))
