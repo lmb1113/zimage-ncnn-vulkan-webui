@@ -12,7 +12,11 @@ const job = computed(
 const outputs = computed(() => {
   const j = job.value
   if (!j || !j.outputs) return []
-  return j.outputs.map((n) => ({ name: n, url: api.mediaUrl(n) }))
+  // 图库刷新后过滤掉已被删除的输出，避免预览破图
+  const names = store.gallery.length ? new Set(store.gallery.map((g) => g.name)) : null
+  return j.outputs
+    .filter((n) => !names || names.has(n))
+    .map((n) => ({ name: n, url: api.mediaUrl(n) }))
 })
 
 const current = computed(() => outputs.value[Math.min(idx.value, outputs.value.length - 1)] || null)

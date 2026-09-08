@@ -1,10 +1,17 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import api from '../api'
 import { store, refreshGallery, selectImage, removeImage, notify, openLightbox, reuseImage } from '../store'
 
 const keyword = ref('')
 const filter = ref('all')
+
+// 分页渲染：网格每次只挂 60 张，避免大图库 DOM 过重
+const PAGE = 60
+const visibleCount = ref(PAGE)
+watch([keyword, filter], () => {
+  visibleCount.value = PAGE
+})
 
 const modeLabels = {
   txt2img: '文生图',
@@ -44,6 +51,8 @@ const list = computed(() => {
     )
   })
 })
+
+const visibleList = computed(() => list.value.slice(0, visibleCount.value))
 
 function fmtSize(b) {
   if (!b) return '—'
@@ -118,7 +127,7 @@ onMounted(() => {
 
       <div v-if="list.length" class="grid">
         <button
-          v-for="it in list"
+          v-for="it in visibleList"
           :key="it.name"
           class="card item"
           :class="{ on: store.selected && store.selected.name === it.name }"
@@ -135,7 +144,13 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-else class="empty">
+      <div v-if="list.length > visibleList.length" class="more-wrap">
+        <button class="btn btn-ghost" @click="visibleCount += PAGE">
+          加载更多（还有 {{ list.length - visibleList.length }} 张）
+        </button>
+      </div>
+
+      <div v-if="!list.length" class="empty">
         <span>还没有生成记录</span>
         <span class="sub">回到「生成工作台」跑第一张图吧</span>
       </div>
@@ -365,6 +380,12 @@ onMounted(() => {
 }
 .sub {
   display: block;
+}
+.more-wrap {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
 }
 .link-row {
   display: flex;
