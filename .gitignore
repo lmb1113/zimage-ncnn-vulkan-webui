@@ -12,3 +12,4 @@ uploads/
 # 编辑器
 .vscode/
 .idea/
+ui_*.png
