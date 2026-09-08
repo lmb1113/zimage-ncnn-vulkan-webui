@@ -1,0 +1,498 @@
+<script setup>
+import { reactive, ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import api from '../api'
+import { store, notify, isBusy, activeJob } from '../store'
+
+const modes = [
+  { key: 'txt2img', label: '文生图' },
+  { key: 'inpaint', label: '局部重绘' },
+  { key: 'outpaint', label: '画布扩图' },
+  { key: 'controlnet', label: 'ControlNet' },
+  { key: 'tile', label: 'Tile 放大' },
+]
+
+const presets = [
+  { label: '1024×1024', w: 1024, h: 1024 },
+  { label: '768×1024', w: 768, h: 1024 },
+  { label: '1024×768', w: 1024, h: 768 },
+  { label: '2048×2048', w: 2048, h: 2048 },
+  { label: '2048×512', w: 2048, h: 512 },
+]
+
+const params = reactive({
+  prompt: '',
+  negative: '',
+  width: 1024,
+  height: 1024,
+  steps: 0,
+  seed: -1,
+  batch: 1,
+  modelPath: '',
+  gpuId: -2,
+  inputImage: '',
+  maskImage: '',
+  outpaint: '128,128,128,128',
+  controlImage: '',
+  controlScale: 1.0,
+  tileUpscale: false,
+})
+
+const mode = ref('txt2img')
+const previews = reactive({})
+const showAdvanced = ref(false)
+
+watch(
+  () => store.pendingParams,
+  (p) => {
+    if (!p) return
+    Object.assign(params, p)
+    store.pendingParams = null
+  }
+)
+
+function setPreset(p) {
+  params.width = p.w
+  params.height = p.h
+}
+
+function randomSeed() {
+  params.seed = Math.floor(Math.random() * 2147483647)
+}
+
+async function uploadFile(file, key) {
+  try {
+    const r = await api.upload(file)
+    params[key] = r.path
+    previews[key] = r.url
+    notify(`已上传 ${file.name}`, 'success')
+  } catch (e) {
+    notify(e.message, 'error')
+  }
+}
+
+function pickFile(key) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = async () => {
+    const f = input.files && input.files[0]
+    if (f) await uploadFile(f, key)
+  }
+  input.click()
+}
+
+function onDrop(e, key) {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0]
+  if (f && f.type.startsWith('image/')) uploadFile(f, key)
+}
+
+function onKey(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canSubmit.value) submit()
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onUnmounted(() => window.removeEventListener('keydown', onKey))
+
+const canSubmit = computed(() => !isBusy.value && params.prompt.trim() !== '')
+
+async function submit() {
+  if (!canSubmit.value) return
+  const payload = { ...params }
+  if (mode.value === 'tile') payload.tileUpscale = true
+  try {
+    await api.generate(mode.value, payload)
+    notify('任务已提交')
+  } catch (e) {
+    notify(e.message, 'error')
+  }
+}
+
+function cancel() {
+  if (activeJob.value) {
+    api.cancelJob(activeJob.value.id)
+  }
+}
+
+function reset() {
+  Object.assign(params, {
+    prompt: '',
+    negative: '',
+    width: 1024,
+    height: 1024,
+    steps: 0,
+    seed: -1,
+    batch: 1,
+    inputImage: '',
+    maskImage: '',
+    outpaint: '128,128,128,128',
+    controlImage: '',
+    controlScale: 1.0,
+  })
+  for (const k of Object.keys(previews)) delete previews[k]
+}
+</script>
+
+<template>
+  <aside class="panel">
+    <div class="tabs">
+      <button
+        v-for="m in modes"
+        :key="m.key"
+        class="tab"
+        :class="{ active: mode === m.key }"
+        @click="mode = m.key"
+      >
+        {{ m.label }}
+      </button>
+    </div>
+
+    <div class="group">
+      <div class="row-between">
+        <span class="field-label">提示词</span>
+        <span class="counter">{{ params.prompt.length }} 字</span>
+      </div>
+      <textarea
+        v-model="params.prompt"
+        rows="4"
+        placeholder="描述你想生成的画面，支持中英文"
+      />
+    </div>
+
+    <div class="group">
+      <span class="field-label">反向提示词</span>
+      <textarea
+        v-model="params.negative"
+        rows="2"
+        placeholder="低清晰度，畸变的手指，水印，文字"
+      />
+    </div>
+
+    <!-- 模式相关输入 -->
+    <div v-if="mode === 'inpaint'" class="group uploads">
+      <button
+        class="uploader"
+        title="点击选择或拖入图片"
+        @click="pickFile('inputImage')"
+        @dragover.prevent
+        @drop.prevent="onDrop($event, 'inputImage')"
+      >
+        <img v-if="previews.inputImage" :src="previews.inputImage" alt="" />
+        <span v-else>上传输入图像 · -i（可拖入）</span>
+      </button>
+      <button
+        class="uploader"
+        title="点击选择或拖入遮罩"
+        @click="pickFile('maskImage')"
+        @dragover.prevent
+        @drop.prevent="onDrop($event, 'maskImage')"
+      >
+        <img v-if="previews.maskImage" :src="previews.maskImage" alt="" />
+        <span v-else>上传遮罩图 · 白=重绘 黑=保留</span>
+      </button>
+    </div>
+
+    <div v-else-if="mode === 'outpaint'" class="group">
+      <button
+        class="uploader"
+        title="点击选择或拖入图片"
+        @click="pickFile('inputImage')"
+        @dragover.prevent
+        @drop.prevent="onDrop($event, 'inputImage')"
+      >
+        <img v-if="previews.inputImage" :src="previews.inputImage" alt="" />
+        <span v-else>上传输入图像 · -i（可拖入）</span>
+      </button>
+      <div class="row-between">
+        <span class="field-label">扩展 左,上,右,下</span>
+      </div>
+      <input v-model="params.outpaint" placeholder="128,128,128,128" />
+    </div>
+
+    <div v-else-if="mode === 'controlnet' || mode === 'tile'" class="group">
+      <button
+        class="uploader"
+        title="点击选择或拖入图片"
+        @click="pickFile('controlImage')"
+        @dragover.prevent
+        @drop.prevent="onDrop($event, 'controlImage')"
+      >
+        <img v-if="previews.controlImage" :src="previews.controlImage" alt="" />
+        <span v-else>{{
+          mode === 'tile' ? '上传低分辨率图 · -c -t' : '上传控制图（姿态/线稿/灰度）'
+        }}</span>
+      </button>
+      <div class="row-between">
+        <span class="field-label">控制强度 · -w</span>
+        <span class="value">{{ params.controlScale.toFixed(2) }}</span>
+      </div>
+      <input
+        v-model.number="params.controlScale"
+        type="range"
+        min="0"
+        max="2"
+        step="0.05"
+      />
+    </div>
+
+    <div class="group params">
+      <span class="section-title">生成参数</span>
+
+      <div class="row-between">
+        <span class="field-label">输出尺寸</span>
+        <div class="inline">
+          <input class="num" v-model.number="params.width" type="number" />
+          <span class="x">×</span>
+          <input class="num" v-model.number="params.height" type="number" />
+        </div>
+      </div>
+      <div class="presets">
+        <button
+          v-for="p in presets"
+          :key="p.label"
+          class="preset"
+          :class="{ on: params.width === p.w && params.height === p.h }"
+          @click="setPreset(p)"
+        >
+          {{ p.label }}
+        </button>
+      </div>
+
+      <div class="row-between">
+        <span class="field-label">采样步数 · -l</span>
+        <input class="num" v-model.number="params.steps" type="number" min="0" />
+      </div>
+
+      <div class="row-between">
+        <span class="field-label">随机种子 · -r</span>
+        <div class="inline">
+          <input class="num wide" v-model.number="params.seed" type="number" />
+          <button class="icon-btn" title="随机" @click="randomSeed">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect
+                x="3.5"
+                y="3.5"
+                width="17"
+                height="17"
+                rx="4.5"
+                stroke="#4B5563"
+                stroke-width="1.6"
+              />
+              <circle cx="8.4" cy="8.4" r="1.3" fill="#4B5563" />
+              <circle cx="15.6" cy="15.6" r="1.3" fill="#4B5563" />
+              <circle cx="12" cy="12" r="1.3" fill="#4B5563" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="row-between">
+        <span class="field-label">批量张数 · -b</span>
+        <div class="stepper">
+          <button @click="params.batch = Math.max(1, params.batch - 1)">−</button>
+          <span>{{ params.batch }}</span>
+          <button @click="params.batch = Math.min(16, params.batch + 1)">+</button>
+        </div>
+      </div>
+
+      <button class="adv-toggle" @click="showAdvanced = !showAdvanced">
+        {{ showAdvanced ? '收起高级设置' : '展开高级设置' }}
+      </button>
+
+      <template v-if="showAdvanced">
+        <div class="row-between">
+          <span class="field-label">模型路径 · -m</span>
+          <input class="num wide" v-model="params.modelPath" placeholder="z-image-turbo" />
+        </div>
+        <div class="row-between">
+          <span class="field-label">计算设备 · -g</span>
+          <select class="num wide" v-model.number="params.gpuId">
+            <option :value="-2">自动</option>
+            <option :value="-1">CPU</option>
+            <option :value="0">GPU 0</option>
+            <option :value="1">GPU 1</option>
+            <option :value="2">GPU 2</option>
+          </select>
+        </div>
+      </template>
+    </div>
+
+    <div class="spacer" />
+
+    <button v-if="!isBusy" class="btn btn-primary block" :disabled="!canSubmit" @click="submit">
+      开始生成 <span class="kbd">Ctrl + ↵</span>
+    </button>
+    <button v-else class="btn btn-danger block" @click="cancel">取消当前任务</button>
+    <button class="btn btn-ghost block" @click="reset">重置参数</button>
+  </aside>
+</template>
+
+<style scoped>
+.panel {
+  width: 400px;
+  flex: none;
+  background: #fff;
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab {
+  padding: 7px 12px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  background: var(--tint);
+  color: var(--text-2);
+  transition: background 0.15s, color 0.15s;
+}
+.tab.active {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 500;
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.params {
+  gap: 14px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.counter {
+  font-size: 11px;
+  color: var(--muted);
+}
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.num {
+  width: 76px;
+  text-align: center;
+  padding: 7px 4px;
+}
+.num.wide {
+  width: 140px;
+  text-align: left;
+}
+.x {
+  color: var(--muted);
+}
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.preset {
+  font-size: 11px;
+  padding: 5px 9px;
+  border-radius: var(--r-sm);
+  background: var(--tint);
+  color: var(--text-2);
+}
+.preset.on {
+  background: var(--ink);
+  color: #fff;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  height: 34px;
+  width: 108px;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.stepper button {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1;
+}
+.stepper button:hover {
+  background: var(--tint);
+}
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: #fff;
+}
+.icon-btn:hover {
+  background: var(--tint-2);
+}
+.adv-toggle {
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: left;
+  padding: 0;
+}
+.adv-toggle:hover {
+  color: var(--text);
+}
+.uploads {
+  gap: 10px;
+}
+.uploader {
+  height: 84px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--tint-2);
+  color: var(--text-3);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+}
+.uploader:hover {
+  border-color: var(--ink);
+  color: var(--text);
+}
+.uploader img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.value {
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.spacer {
+  flex: 1;
+  min-height: 16px;
+}
+.block {
+  width: 100%;
+}
+.kbd {
+  font-size: 11px;
+  opacity: 0.55;
+  margin-left: 4px;
+}
+</style>
