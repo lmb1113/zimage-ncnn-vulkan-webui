@@ -14,4 +14,5 @@ uploads/
 .idea/
 ui_*.png
 zimage-webui
-dist/
+# 仅忽略根目录的交叉编译产物目录，不能误伤前端构建产物 web/dist/
+/dist/
