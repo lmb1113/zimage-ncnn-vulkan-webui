@@ -45,6 +45,7 @@ watch(
 )
 
 const models = computed(() => (store.system ? store.system.models || [] : []))
+const foundModels = computed(() => models.value.filter((m) => m.found))
 const exeFound = computed(() => !!(store.system && store.system.exeFound))
 
 async function save() {
@@ -124,7 +125,14 @@ async function clearUploads() {
         <div class="two">
           <label>
             <span>默认模型</span>
-            <input v-model="form.modelPath" placeholder="z-image-turbo" />
+            <input
+              v-model="form.modelPath"
+              list="dl-models-settings"
+              placeholder="z-image-turbo"
+            />
+            <datalist id="dl-models-settings">
+              <option v-for="m in foundModels" :key="m.path" :value="m.name" />
+            </datalist>
           </label>
           <label>
             <span>默认设备</span>

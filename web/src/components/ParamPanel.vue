@@ -45,6 +45,11 @@ const showAdvanced = ref(false)
 const maskEditor = ref(null)
 const inputDims = reactive({ w: 0, h: 0 })
 
+// 环境自检中已就位的模型目录，作为模型路径的可选建议
+const foundModels = computed(() =>
+  ((store.system && store.system.models) || []).filter((m) => m.found)
+)
+
 // 扩图后的最终画布：原图尺寸 + 左/上/右/下边距
 const expandedSize = computed(() => {
   if (!inputDims.w || mode.value !== 'outpaint') return ''
@@ -402,7 +407,15 @@ function reset() {
       <template v-if="showAdvanced">
         <div class="row-between">
           <span class="field-label">模型路径</span>
-          <input class="num wide" v-model="params.modelPath" placeholder="z-image-turbo" />
+          <input
+            class="num wide"
+            v-model="params.modelPath"
+            list="dl-models-param"
+            placeholder="z-image-turbo"
+          />
+          <datalist id="dl-models-param">
+            <option v-for="m in foundModels" :key="m.path" :value="m.name" />
+          </datalist>
         </div>
         <div class="row-between">
           <span class="field-label">计算设备</span>
