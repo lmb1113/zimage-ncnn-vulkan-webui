@@ -62,6 +62,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/gallery/{name}", s.galleryDelete)
 
 	mux.HandleFunc("POST /api/open", s.openPath)
+	mux.HandleFunc("GET /api/autostart", s.getAutostart)
+	mux.HandleFunc("POST /api/autostart", s.postAutostart)
 
 	mux.HandleFunc("/media/", s.mediaHandler)
 	mux.HandleFunc("/uploads/", s.uploadHandler)
@@ -310,6 +312,35 @@ func (s *Server) openPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// autostartStatus 返回当前平台是否支持自启及当前状态。
+func (s *Server) getAutostart(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]bool{
+		"supported": AutostartSupported(),
+		"enabled":   AutostartSupported() && IsAutostartEnabled(),
+	})
+}
+
+type autostartRequest struct {
+	Enable bool `json:"enable"`
+}
+
+func (s *Server) postAutostart(w http.ResponseWriter, r *http.Request) {
+	if !AutostartSupported() {
+		writeErr(w, http.StatusBadRequest, "当前平台暂不支持开机自启")
+		return
+	}
+	var req autostartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := SetAutostart(req.Enable); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, map[string]bool{"ok": true, "enabled": IsAutostartEnabled()})
 }
 
 func (s *Server) mediaHandler(w http.ResponseWriter, r *http.Request) {

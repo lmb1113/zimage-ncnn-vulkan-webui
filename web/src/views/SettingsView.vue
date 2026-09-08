@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, watch, computed } from 'vue'
+import { reactive, ref, watch, computed, onMounted } from 'vue'
 import api from '../api'
 import { store, refreshSystem, notify } from '../store'
 
@@ -12,6 +12,29 @@ const form = reactive({
   gpuId: -2,
   port: 19777,
 })
+
+const autostart = reactive({ supported: false, enabled: false })
+
+onMounted(async () => {
+  try {
+    const s = await api.autostartStatus()
+    autostart.supported = s.supported
+    autostart.enabled = s.enabled
+  } catch (e) {
+    /* 忽略，界面隐藏该开关 */
+  }
+})
+
+async function toggleAutostart() {
+  const next = !autostart.enabled
+  try {
+    const r = await api.setAutostart(next)
+    autostart.enabled = r.enabled
+    notify(next ? '已开启开机自启' : '已关闭开机自启', 'success')
+  } catch (e) {
+    notify(e.message, 'error')
+  }
+}
 
 watch(
   () => store.system,
@@ -106,6 +129,23 @@ async function openDir(path) {
         </label>
       </section>
 
+      <section v-if="autostart.supported" class="card block-card">
+        <h3>系统</h3>
+        <div class="row-between-as">
+          <div>
+            <span class="as-title">开机自启</span>
+            <p class="as-hint">开机后以静默模式常驻后台，浏览器访问 {{ 'http://127.0.0.1:' + form.port }} 使用</p>
+          </div>
+          <button
+            class="btn btn-sm"
+            :class="autostart.enabled ? 'btn-primary' : 'btn-ghost'"
+            @click="toggleAutostart"
+          >
+            {{ autostart.enabled ? '已开启' : '已关闭' }}
+          </button>
+        </div>
+      </section>
+
       <div class="actions">
         <button class="btn btn-primary" @click="save">保存设置</button>
         <button class="btn btn-ghost" @click="refreshSystem">重新检测</button>
@@ -186,6 +226,22 @@ h3 {
   font-size: 12px;
   color: var(--text-3);
   line-height: 1.7;
+}
+.row-between-as {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.as-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.as-hint {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
 }
 label {
   display: flex;

@@ -51,5 +51,13 @@ export default {
       body: JSON.stringify({ path }),
     }),
 
+  autostartStatus: () => req('/api/autostart'),
+  setAutostart: (enable) =>
+    req('/api/autostart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enable }),
+    }),
+
   mediaUrl: (name) => `/media/${encodeURIComponent(name)}`,
 }
