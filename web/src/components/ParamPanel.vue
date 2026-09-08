@@ -1,7 +1,7 @@
 <script setup>
 import { reactive, ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import api from '../api'
-import { store, notify, isBusy, activeJob } from '../store'
+import { store, notify, isBusy, activeJob, ensureNotifyPermission } from '../store'
 import MaskEditor from './MaskEditor.vue'
 
 const modes = [
@@ -208,6 +208,7 @@ async function submit() {
   const payload = { ...params }
   if (mode.value === 'tile') payload.tileUpscale = true
   try {
+    ensureNotifyPermission() // 首次提交时征询通知权限，长任务结束后可在后台收到提醒
     // 图生图 = ControlNet 路线：引擎无原生 img2img，用 -c 参考图实现
     await api.generate(mode.value === 'img2img' ? 'controlnet' : mode.value, payload)
     notify('任务已提交')

@@ -1,4 +1,4 @@
-import { reactive, computed } from 'vue'
+import { reactive, computed, watchEffect } from 'vue'
 import api from './api'
 
 export const store = reactive({
@@ -78,6 +78,20 @@ export function notify(message, kind = 'info') {
   store.toast = { message, kind }
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (store.toast = null), 3000)
+}
+
+// 长任务结束时的系统通知（仅在页面处于后台时弹）
+export function ensureNotifyPermission() {
+  if (!('Notification' in window)) return
+  if (Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
+}
+
+function notifyIfHidden(title, body, ok) {
+  if (!document.hidden || !('Notification' in window)) return
+  if (Notification.permission !== 'granted') return
+  new Notification(title, { body, tag: 'zimage-job' })
 }
 
 export const activeJob = computed(() =>
@@ -165,6 +179,11 @@ export function connectEvents() {
 
       if (j.status === 'success' || j.status === 'failed' || j.status === 'canceled') {
         refreshGallery()
+        if (j.status === 'success') {
+          notifyIfHidden('生成完成 ✓', (j.params && j.params.prompt ? j.params.prompt : '') || '任务已完成')
+        } else if (j.status === 'failed') {
+          notifyIfHidden('生成失败', j.error || '请到控制台查看日志')
+        }
       }
     } else if (payload.type === 'config') {
       store.system = payload.data
@@ -172,6 +191,18 @@ export function connectEvents() {
   }
   return es
 }
+
+const baseTitle = document.title
+watchEffect(() => {
+  const j = activeJob.value
+  if (j && j.status === 'running') {
+    document.title = `生成中 ${j.progress}% · ${baseTitle}`
+  } else if (j && j.status === 'queued') {
+    document.title = `排队中 · ${baseTitle}`
+  } else {
+    document.title = baseTitle
+  }
+})
 
 export async function bootstrap() {
   await refreshSystem()
