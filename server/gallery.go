@@ -11,6 +11,7 @@ import (
 	_ "image/png"
 	"os"
 	"path/filepath"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -32,6 +33,29 @@ type GalleryItem struct {
 	Steps     int    `json:"steps,omitempty"`
 	ElapsedMs int64  `json:"elapsedMs,omitempty"`
 	Command   string `json:"command,omitempty"`
+	InputUrl  string `json:"inputUrl,omitempty"`  // 重绘输入图（可访问 URL）
+	ControlUrl string `json:"controlUrl,omitempty"` // 图生图/控制生成的参考图
+}
+
+// mediaURLFor 把服务端路径转成可访问 URL（输出目录走 /media，其余按 /uploads）。
+func mediaURLFor(p string) string {
+	if p == "" {
+		return ""
+	}
+	name := urlPathEscape(filepath.Base(p))
+	cfg := GetConfig()
+	if cfg.OutputDir != "" {
+		if abs, err := filepath.Abs(p); err == nil {
+			if outAbs, err2 := filepath.Abs(cfg.OutputDir); err2 == nil && strings.HasPrefix(abs, outAbs) {
+				return "/media/" + name
+			}
+		}
+	}
+	return "/uploads/" + name
+}
+
+func urlPathEscape(name string) string {
+	return strings.ReplaceAll(url.QueryEscape(name), "+", "%20")
 }
 
 // metaRecord 是写在 .meta 目录里的生成参数快照。
@@ -141,6 +165,8 @@ func ListGallery() []GalleryItem {
 			items[i].Steps = rec.Params.Steps
 			items[i].ElapsedMs = rec.ElapsedMs
 			items[i].Command = rec.Command
+			items[i].InputUrl = mediaURLFor(rec.Params.InputImage)
+			items[i].ControlUrl = mediaURLFor(rec.Params.ControlImage)
 		}
 	}
 	return items
@@ -176,6 +202,8 @@ func GalleryDetail(name string) (GalleryItem, bool) {
 		it.Steps = rec.Params.Steps
 		it.ElapsedMs = rec.ElapsedMs
 		it.Command = rec.Command
+		it.InputUrl = mediaURLFor(rec.Params.InputImage)
+		it.ControlUrl = mediaURLFor(rec.Params.ControlImage)
 	}
 	return it, true
 }

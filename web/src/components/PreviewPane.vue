@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import api from '../api'
 import { store, activeJob, openLightbox, reuseImage } from '../store'
+import CompareSlider from './CompareSlider.vue'
 
 const idx = ref(0)
 
@@ -58,9 +59,6 @@ const compareWith = computed(() => {
   return p.inputImage || p.controlImage || ''
 })
 const showCompare = ref(false)
-const cmpPct = ref(50)
-const cmpEl = ref(null)
-let cmpDown = false
 
 // 服务端路径 → 可访问 URL（uploads 与 out 分别由 /uploads、/media 提供）
 function pathToUrl(p) {
@@ -69,16 +67,8 @@ function pathToUrl(p) {
   return /[\\/]out[\\/]/.test(p) ? '/media/' + encodeURIComponent(name) : '/uploads/' + encodeURIComponent(name)
 }
 
-function cmpMove(e) {
-  if (!cmpDown || !cmpEl.value) return
-  const r = cmpEl.value.getBoundingClientRect()
-  let pct = ((e.clientX - r.left) / r.width) * 100
-  cmpPct.value = Math.max(0, Math.min(100, pct))
-}
-
 function toggleCompare() {
   showCompare.value = !showCompare.value
-  cmpPct.value = 50
 }
 
 const metaText = computed(() => {
@@ -102,27 +92,12 @@ const metaText = computed(() => {
     </div>
 
     <div v-if="current" class="stage">
-      <div
+      <CompareSlider
         v-if="showCompare && compareWith"
-        ref="cmpEl"
-        class="cmp clickable"
-        title="拖动分割线对比"
-        @pointerdown="cmpDown = true"
-        @pointermove="cmpMove"
-        @pointerup="cmpDown = false"
-        @pointerleave="cmpDown = false"
-      >
-        <img class="cmp-img" :src="pathToUrl(compareWith)" alt="原图" />
-        <img
-          class="cmp-img cmp-top"
-          :src="current.url"
-          :alt="current.name"
-          :style="{ clipPath: 'inset(0 0 0 ' + cmpPct + '%)' }"
-        />
-        <div class="cmp-line" :style="{ left: cmpPct + '%' }" />
-        <span class="cmp-tag left">原图</span>
-        <span class="cmp-tag right">结果</span>
-      </div>
+        class="cmp-holder"
+        :before="pathToUrl(compareWith)"
+        :after="current.url"
+      />
       <img
         v-else
         class="main-img clickable"
@@ -291,53 +266,39 @@ const metaText = computed(() => {
   border-color: var(--ink);
   color: #fff;
 }
-.cmp {
-  position: relative;
+.cmp-holder {
   max-width: 100%;
   max-height: 100%;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--tint);
-  touch-action: none;
-  cursor: ew-resize;
-  line-height: 0;
 }
-.cmp-img {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 100%;
-  object-fit: contain;
+.foot-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
-.cmp-top {
-  position: absolute;
-  inset: 0;
-  height: 100%;
-  object-fit: contain;
+.foot-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
 }
-.cmp-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
+.qa {
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
   background: #fff;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
 }
-.cmp-tag {
-  position: absolute;
-  bottom: 10px;
-  font-size: 11px;
+.qa:hover {
+  border-color: var(--ink);
+  color: var(--text);
+}
+.qa.on {
+  background: var(--ink);
+  border-color: var(--ink);
   color: #fff;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: 4px;
-  padding: 2px 8px;
-  line-height: 1.4;
-}
-.cmp-tag.left {
-  left: 10px;
-}
-.cmp-tag.right {
-  right: 10px;
 }
 .status {
   color: var(--text-2);
