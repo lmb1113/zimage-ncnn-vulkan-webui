@@ -10,8 +10,8 @@ const modeLabels = {
   txt2img: '文生图',
   inpaint: '局部重绘',
   outpaint: '画布扩图',
-  controlnet: '图生图 / ControlNet',
-  tile: 'Tile 放大',
+  controlnet: '图生图 / 控制生成',
+  tile: '图片放大',
 }
 
 const counts = computed(() => {

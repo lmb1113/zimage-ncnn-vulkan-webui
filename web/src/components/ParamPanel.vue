@@ -9,8 +9,8 @@ const modes = [
   { key: 'img2img', label: '图生图' },
   { key: 'inpaint', label: '局部重绘' },
   { key: 'outpaint', label: '画布扩图' },
-  { key: 'controlnet', label: 'ControlNet' },
-  { key: 'tile', label: 'Tile 放大' },
+  { key: 'controlnet', label: '控制生成' },
+  { key: 'tile', label: '图片放大' },
 ]
 
 const presets = [
@@ -286,7 +286,7 @@ function reset() {
         <img v-if="previews.controlImage" :src="previews.controlImage" alt="" />
         <span v-else>{{
           mode === 'tile'
-            ? '上传低分辨率图 · -c -t'
+            ? '上传低分辨率图（放大到目标尺寸）'
             : mode === 'img2img'
               ? '上传参考图 · -c（可拖入）'
               : '上传控制图（姿态/线稿/灰度）'

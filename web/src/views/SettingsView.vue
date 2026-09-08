@@ -171,7 +171,7 @@ async function openDir(path) {
       </ul>
 
       <p class="hint">
-        ControlNet 需要 <code>z-image-control</code>，Tile 放大需要
+        控制生成 / 图生图 需要 <code>z-image-control</code>，图片放大 需要
         <code>z-image-control-tile</code>，两者都要放在工作目录下。
       </p>
     </aside>
