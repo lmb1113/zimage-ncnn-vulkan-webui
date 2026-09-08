@@ -23,6 +23,16 @@ const queued = computed(
   () => store.jobs.filter((j) => j.status === 'queued').length
 )
 
+async function cancelQueued() {
+  try {
+    const r = await api.cancelQueued()
+    if (r.canceled > 0) store.toast = { message: `已清空队列（${r.canceled} 个任务）`, kind: 'success' }
+    setTimeout(() => (store.toast = null), 3000)
+  } catch (e) {
+    /* 静默 */
+  }
+}
+
 const headLine = computed(() => {
   if (!activeJob.value) return '空闲 · 可以开始生成'
   const j = activeJob.value
@@ -55,6 +65,7 @@ function cancel() {
         </div>
         <div class="right-side">
           <span v-if="queued > 1" class="pill">队列 {{ queued }}</span>
+          <button v-if="queued > 0" class="btn btn-sm btn-ghost" title="取消所有排队中的任务" @click="cancelQueued">清空排队</button>
           <span class="muted">{{ elapsed }}</span>
           <button v-if="isBusy" class="btn btn-sm btn-danger" @click="cancel">终止</button>
         </div>

@@ -32,6 +32,7 @@ export default {
 
   jobs: () => req('/api/jobs'),
   cancelJob: (id) => req(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+  cancelQueued: () => req('/api/jobs/cancel-queued', { method: 'POST' }),
 
   upload: async (file) => {
     const fd = new FormData()

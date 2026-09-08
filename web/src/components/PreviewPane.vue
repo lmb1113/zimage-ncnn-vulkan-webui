@@ -72,7 +72,7 @@ const metaText = computed(() => {
         :src="current.url"
         :alt="current.name"
         title="点击放大"
-        @click="openLightbox(current.url)"
+        @click="openLightbox(current.url, outputs.map((o) => o.url))"
       />
       <div v-if="outputs.length > 1" class="strip">
         <button

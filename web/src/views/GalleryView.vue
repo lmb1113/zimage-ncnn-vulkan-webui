@@ -149,7 +149,7 @@ onMounted(() => {
           :src="store.selected.url"
           :alt="store.selected.name"
           title="点击放大"
-          @click="openLightbox(store.selected.url)"
+          @click="openLightbox(store.selected.url, list.map((i) => i.url))"
         />
         <span class="name">{{ store.selected.prompt || store.selected.name }}</span>
         <span class="sub">

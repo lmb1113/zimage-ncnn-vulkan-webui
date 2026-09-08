@@ -261,6 +261,25 @@ func (m *Manager) Delete(id string) {
 	m.persist()
 }
 
+// CancelQueued 取消全部排队中的任务，返回取消数量。
+func (m *Manager) CancelQueued() int {
+	m.mu.Lock()
+	ids := make([]string, 0)
+	for _, id := range m.order {
+		if j := m.jobs[id]; j != nil && j.Status == StatusQueued {
+			ids = append(ids, id)
+		}
+	}
+	m.mu.Unlock()
+	n := 0
+	for _, id := range ids {
+		if m.Cancel(id) {
+			n++
+		}
+	}
+	return n
+}
+
 // Cancel 取消正在运行或排队中的任务。
 func (m *Manager) Cancel(id string) bool {
 	m.mu.Lock()

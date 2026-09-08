@@ -14,10 +14,22 @@ export const store = reactive({
   pendingParams: null,
   // 全屏预览的图片地址
   lightbox: null,
+  // 灯箱上下文：可导航的图片列表与当前下标（左右方向键切图）
+  lightboxList: [],
+  lightboxIdx: 0,
 })
 
-export function openLightbox(url) {
+export function openLightbox(url, list) {
   store.lightbox = url
+  store.lightboxList = Array.isArray(list) && list.length ? list : [url]
+  store.lightboxIdx = Math.max(0, store.lightboxList.indexOf(url))
+}
+
+export function lightboxNav(delta) {
+  const l = store.lightboxList
+  if (!store.lightbox || l.length < 2) return
+  store.lightboxIdx = (store.lightboxIdx + delta + l.length) % l.length
+  store.lightbox = l[store.lightboxIdx]
 }
 
 // 一键联动：把图库/预览中的图带入生成工作台（mode: img2img | inpaint）

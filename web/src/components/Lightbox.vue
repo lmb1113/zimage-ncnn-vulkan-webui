@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
-import { store, reuseImage } from '../store'
+import { store, reuseImage, lightboxNav } from '../store'
 
 function close() {
   store.lightbox = null
@@ -18,8 +18,12 @@ function act(mode) {
   if (reuseImage(item.value, mode)) close()
 }
 
+const canNav = computed(() => store.lightboxList.length > 1)
+
 function onKey(e) {
   if (e.key === 'Escape') close()
+  else if (e.key === 'ArrowLeft') lightboxNav(-1)
+  else if (e.key === 'ArrowRight') lightboxNav(1)
 }
 
 onMounted(() => window.addEventListener('keydown', onKey))
@@ -31,6 +35,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <div v-if="store.lightbox" class="lb" @click="close">
       <img :src="store.lightbox" alt="" @click.stop />
       <button class="close" title="关闭 (Esc)" @click="close">×</button>
+      <template v-if="canNav">
+        <button class="nav prev" title="上一张 (←)" @click.stop="lightboxNav(-1)">‹</button>
+        <button class="nav next" title="下一张 (→)" @click.stop="lightboxNav(1)">›</button>
+        <span class="counter">{{ store.lightboxIdx + 1 }} / {{ store.lightboxList.length }}</span>
+      </template>
       <div class="actions" @click.stop>
         <template v-if="item">
           <button class="lb-btn" @click="act('img2img')">作为图生图参考</button>
@@ -74,6 +83,36 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 }
 .close:hover {
   background: rgba(255, 255, 255, 0.26);
+}
+.nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+}
+.nav:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.nav.prev {
+  left: 24px;
+}
+.nav.next {
+  right: 24px;
+}
+.counter {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 .actions {
   position: absolute;

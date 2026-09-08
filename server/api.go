@@ -53,6 +53,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/jobs/{id}", s.getJob)
 	mux.HandleFunc("DELETE /api/jobs/{id}", s.deleteJob)
 	mux.HandleFunc("POST /api/jobs/{id}/cancel", s.cancelJob)
+	mux.HandleFunc("POST /api/jobs/cancel-queued", s.cancelQueued)
 
 	mux.HandleFunc("GET /api/events", s.events)
 
@@ -174,6 +175,10 @@ func (s *Server) deleteJob(w http.ResponseWriter, r *http.Request) {
 func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 	ok := s.mgr.Cancel(r.PathValue("id"))
 	writeJSON(w, map[string]bool{"ok": ok})
+}
+
+func (s *Server) cancelQueued(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]int{"canceled": s.mgr.CancelQueued()})
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
