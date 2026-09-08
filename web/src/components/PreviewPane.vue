@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import api from '../api'
-import { store, activeJob, openLightbox } from '../store'
+import { store, activeJob, openLightbox, reuseImage } from '../store'
 
 const idx = ref(0)
 
@@ -39,6 +39,12 @@ const statusText = computed(() => {
 })
 
 const progress = computed(() => (job.value ? job.value.progress : 0))
+
+// 任务成功后，从图库条目取到服务端路径，支持一键联动
+const galleryItem = computed(() => {
+  if (!current.value || !job.value || job.value.status !== 'success') return null
+  return store.gallery.find((g) => g.name === current.value.name) || null
+})
 
 const metaText = computed(() => {
   const j = job.value
@@ -98,9 +104,15 @@ const metaText = computed(() => {
     </div>
 
     <div class="foot">
-      <span class="status">{{ statusText }}</span>
-      <span class="meta">{{ metaText || (current ? current.name : '') }}</span>
-      <a v-if="current" class="dl" :href="current.url" download>保存图片</a>
+      <div class="foot-left">
+        <span class="status">{{ statusText }}</span>
+        <span class="meta">{{ metaText || (current ? current.name : '') }}</span>
+      </div>
+      <div class="foot-right">
+        <button v-if="galleryItem" class="qa" title="以这张图为参考生成新画面" @click="reuseImage(galleryItem, 'img2img')">图生图</button>
+        <button v-if="galleryItem" class="qa" title="在这张图上局部重绘" @click="reuseImage(galleryItem, 'inpaint')">重绘</button>
+        <a v-if="current" class="dl" :href="current.url" download>保存图片</a>
+      </div>
     </div>
   </section>
 </template>
@@ -190,6 +202,31 @@ const metaText = computed(() => {
   gap: 12px;
   font-size: 12px;
   color: var(--muted);
+}
+.foot-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.foot-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.qa {
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: #fff;
+  white-space: nowrap;
+}
+.qa:hover {
+  border-color: var(--ink);
+  color: var(--text);
 }
 .status {
   color: var(--text-2);

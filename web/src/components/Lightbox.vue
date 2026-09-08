@@ -1,9 +1,21 @@
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
-import { store } from '../store'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { store, reuseImage } from '../store'
 
 function close() {
   store.lightbox = null
+}
+
+// 由 /media/<name> 反查图库条目，拿到服务端 path 才能联动
+const item = computed(() => {
+  if (!store.lightbox) return null
+  const name = decodeURIComponent(String(store.lightbox).split('/media/')[1] || '')
+  if (!name) return null
+  return store.gallery.find((g) => g.name === name) || null
+})
+
+function act(mode) {
+  if (reuseImage(item.value, mode)) close()
 }
 
 function onKey(e) {
@@ -19,7 +31,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <div v-if="store.lightbox" class="lb" @click="close">
       <img :src="store.lightbox" alt="" @click.stop />
       <button class="close" title="关闭 (Esc)" @click="close">×</button>
-      <a class="dl" :href="store.lightbox" download @click.stop>下载原图</a>
+      <div class="actions" @click.stop>
+        <template v-if="item">
+          <button class="lb-btn" @click="act('img2img')">作为图生图参考</button>
+          <button class="lb-btn" @click="act('inpaint')">作为重绘输入</button>
+        </template>
+        <a class="lb-btn" :href="store.lightbox" download>下载原图</a>
+      </div>
     </div>
   </transition>
 </template>
@@ -37,7 +55,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 }
 .lb img {
   max-width: 92vw;
-  max-height: 88vh;
+  max-height: 82vh;
   border-radius: 10px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   cursor: default;
@@ -57,19 +75,24 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 .close:hover {
   background: rgba(255, 255, 255, 0.26);
 }
-.dl {
+.actions {
   position: absolute;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+.lb-btn {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
   font-size: 13px;
   padding: 9px 18px;
   border-radius: 999px;
   text-decoration: none;
+  white-space: nowrap;
 }
-.dl:hover {
+.lb-btn:hover {
   background: rgba(255, 255, 255, 0.26);
 }
 .fade-enter-active,

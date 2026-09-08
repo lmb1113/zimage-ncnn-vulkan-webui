@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import api from '../api'
-import { store, refreshGallery, selectImage, removeImage, notify, openLightbox } from '../store'
+import { store, refreshGallery, selectImage, removeImage, notify, openLightbox, reuseImage } from '../store'
 
 const keyword = ref('')
 const filter = ref('all')
@@ -80,48 +80,13 @@ function reuse() {
   notify('参数已带回到生成工作台')
 }
 
-// 一键联动：把当前图作为图生图参考图
+// 一键联动：共用 store.reuseImage（图库 / 预览 / 灯箱同源）
 function useAsImg2img() {
-  const it = store.selected
-  if (!it || !it.path) return
-  store.pendingParams = {
-    mode: 'img2img',
-    previews: { controlImage: it.url },
-    controlImage: it.path,
-    prompt: '',
-    negative: '',
-    width: it.width || 1024,
-    height: it.height || 1024,
-    steps: 0,
-    seed: -1,
-    batch: 1,
-    controlScale: 1.0,
-    inputImage: '',
-    maskImage: '',
-  }
-  store.view = 'generate'
-  notify('已切换到图生图，参考图已就位')
+  reuseImage(store.selected, 'img2img')
 }
 
-// 一键联动：把当前图作为局部重绘输入图
 function useAsInpaint() {
-  const it = store.selected
-  if (!it || !it.path) return
-  store.pendingParams = {
-    mode: 'inpaint',
-    previews: { inputImage: it.url },
-    inputImage: it.path,
-    maskImage: '',
-    prompt: '',
-    negative: '',
-    width: it.width || 1024,
-    height: it.height || 1024,
-    steps: 0,
-    seed: -1,
-    batch: 1,
-  }
-  store.view = 'generate'
-  notify('已切换到局部重绘，输入图已就位')
+  reuseImage(store.selected, 'inpaint')
 }
 
 onMounted(() => {

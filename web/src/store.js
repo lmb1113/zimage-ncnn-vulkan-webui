@@ -20,6 +20,47 @@ export function openLightbox(url) {
   store.lightbox = url
 }
 
+// 一键联动：把图库/预览中的图带入生成工作台（mode: img2img | inpaint）
+// 返回是否成功；图片必须带服务端 path（图库条目或任务输出）
+export function reuseImage(item, mode) {
+  if (!item || !item.path) return false
+  const base = {
+    prompt: '',
+    negative: '',
+    width: item.width || 1024,
+    height: item.height || 1024,
+    steps: 0,
+    seed: -1,
+    batch: 1,
+    inputImage: '',
+    maskImage: '',
+    controlImage: '',
+    controlScale: 1.0,
+  }
+  if (mode === 'img2img') {
+    store.pendingParams = {
+      ...base,
+      mode: 'img2img',
+      previews: { controlImage: item.url },
+      controlImage: item.path,
+    }
+    store.view = 'generate'
+    notify('已切换到图生图，参考图已就位')
+  } else if (mode === 'inpaint') {
+    store.pendingParams = {
+      ...base,
+      mode: 'inpaint',
+      previews: { inputImage: item.url },
+      inputImage: item.path,
+    }
+    store.view = 'generate'
+    notify('已切换到局部重绘，输入图已就位')
+  } else {
+    return false
+  }
+  return true
+}
+
 let toastTimer = null
 export function notify(message, kind = 'info') {
   store.toast = { message, kind }
