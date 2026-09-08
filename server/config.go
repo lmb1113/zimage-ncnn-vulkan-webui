@@ -22,7 +22,7 @@ type Config struct {
 const exeBaseName = "zimage-ncnn-vulkan"
 
 // AppVersion 是工作台的版本号，随每次发版更新。
-const AppVersion = "v0.2.3"
+const AppVersion = "v0.2.4"
 
 var (
 	cfgMu   sync.RWMutex

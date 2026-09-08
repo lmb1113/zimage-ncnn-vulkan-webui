@@ -88,7 +88,7 @@ export function ensureNotifyPermission() {
   }
 }
 
-function notifyIfHidden(title, body, ok) {
+function notifyIfHidden(title, body) {
   if (!document.hidden || !('Notification' in window)) return
   if (Notification.permission !== 'granted') return
   new Notification(title, { body, tag: 'zimage-job' })
