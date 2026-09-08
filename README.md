@@ -3,7 +3,9 @@
 基于 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 的本地生图管理与操作前端。
 Go 后端 + Vue3 前端，整体白色调，编译为单个可执行文件，双击即用。
 
-> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器）
+> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.1.0`
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## 界面预览
 
@@ -223,3 +225,9 @@ WDDM 限制 Vulkan 应用只能用一半系统内存，需满足「一半内存 
 - Z-Image 模型：[Tongyi-MAI/Z-Image](https://github.com/Tongyi-MAI/Z-Image)
 - 模型下载：[nihui-szyl/z-image-ncnn](https://huggingface.co/nihui-szyl/z-image-ncnn/tree/main)
 - 重绘管线参考：[scraed/LanPaint](https://github.com/scraed/LanPaint)
+
+## 开源协议
+
+本项目基于 [MIT License](LICENSE) 开源。
+
+版本号定义在后端 `server/config.go` 的 `AppVersion` 常量中，页面右上角与设置接口 `/api/system` 同步展示；发版时更新该常量并重新构建即可。

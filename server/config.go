@@ -21,6 +21,9 @@ type Config struct {
 
 const exeBaseName = "zimage-ncnn-vulkan"
 
+// AppVersion 是工作台的版本号，随每次发版更新。
+const AppVersion = "v0.1.0"
+
 var (
 	cfgMu   sync.RWMutex
 	cfgData Config
@@ -181,6 +184,7 @@ type ModelInfo struct {
 
 // SystemInfo 是设置页展示的环境自检结果。
 type SystemInfo struct {
+	Version  string      `json:"version"`
 	Config   Config      `json:"config"`
 	ExeFound bool        `json:"exeFound"`
 	Models   []ModelInfo `json:"models"`
@@ -189,7 +193,7 @@ type SystemInfo struct {
 // Inspect 检查可执行文件与模型目录是否就位。
 func Inspect() SystemInfo {
 	c := GetConfig()
-	info := SystemInfo{Config: c}
+	info := SystemInfo{Version: AppVersion, Config: c}
 	if st, err := os.Stat(c.ExePath); err == nil && !st.IsDir() {
 		info.ExeFound = true
 	}
