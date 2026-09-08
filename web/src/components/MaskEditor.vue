@@ -148,13 +148,31 @@ async function exportMask() {
   return new File([blob], 'mask.png', { type: 'image/png' })
 }
 
+function onKey(e) {
+  // 焦点在输入框时不拦截
+  const tag = (e.target && e.target.tagName) || ''
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault()
+    undo()
+  } else if (e.key === '[') {
+    brushSize.value = Math.max(6, Number(brushSize.value) - 4)
+  } else if (e.key === ']') {
+    brushSize.value = Math.min(120, Number(brushSize.value) + 4)
+  }
+}
+
 watch(() => props.src, load)
 onMounted(() => {
   load()
   ro = new ResizeObserver(setup)
   ro.observe(wrap.value)
+  window.addEventListener('keydown', onKey)
 })
-onUnmounted(() => ro && ro.disconnect())
+onUnmounted(() => {
+  ro && ro.disconnect()
+  window.removeEventListener('keydown', onKey)
+})
 
 defineExpose({ hasStrokes, exportMask, clear })
 </script>
@@ -191,7 +209,7 @@ defineExpose({ hasStrokes, exportMask, clear })
         @pointercancel="up"
       />
     </div>
-    <p class="mhint">在图上涂抹需要重绘的区域（红色），提交时自动生成蒙版</p>
+    <p class="mhint">在图上涂抹需要重绘的区域（红色），提交时自动生成蒙版。快捷键：Ctrl+Z 撤销、[ / ] 调笔刷</p>
   </div>
 </template>
 

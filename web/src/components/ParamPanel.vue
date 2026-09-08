@@ -131,6 +131,8 @@ function onDrop(e, key) {
 }
 
 function onKey(e) {
+  // 中文输入法组词中的 Enter（isComposing / keyCode 229）不触发提交
+  if (e.isComposing || e.keyCode === 229) return
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canSubmit.value) submit()
 }
 
