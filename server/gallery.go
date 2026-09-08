@@ -3,6 +3,9 @@ package server
 import (
 	"encoding/json"
 	"image"
+	"image/jpeg"
+
+	"golang.org/x/image/draw"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
@@ -177,7 +180,7 @@ func GalleryDetail(name string) (GalleryItem, bool) {
 	return it, true
 }
 
-// DeleteImage 删除图片及其元数据。
+// DeleteImage 删除图片及其元数据与缩略图缓存。
 func DeleteImage(name string) error {
 	cfg := GetConfig()
 	clean := filepath.Base(name)
@@ -185,5 +188,72 @@ func DeleteImage(name string) error {
 		return err
 	}
 	_ = os.Remove(filepath.Join(metaDir(cfg.OutputDir), clean+".json"))
+	_ = os.Remove(thumbPath(cfg.OutputDir, clean))
 	return nil
+}
+
+// thumbMaxWidth 缩略图最大宽度。
+const thumbMaxWidth = 480
+
+// thumbPath 缩略图缓存路径（.thumbs 目录，随图库删除同步清理）。
+func thumbPath(outputDir, name string) string {
+	return filepath.Join(outputDir, ".thumbs", name+".jpg")
+}
+
+// ensureThumb 首次访问时按最大宽 480px 生成 JPEG 缩略图，返回缓存文件路径。
+// 源图不大于阈值或解码失败时返回错误，由调用方回退原图。
+func ensureThumb(outputDir, name string) (string, error) {
+	src := filepath.Join(outputDir, name)
+	dst := thumbPath(outputDir, name)
+	if st, err := os.Stat(src); err == nil {
+		if tst, err2 := os.Stat(dst); err2 == nil && !tst.ModTime().Before(st.ModTime()) {
+			return dst, nil // 缓存仍新鲜
+		}
+	}
+
+	f, err := os.Open(src)
+	if err != nil {
+		return "", err
+	}
+	img, _, err := image.Decode(f)
+	f.Close()
+	if err != nil {
+		return "", err
+	}
+
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w < 1 || h < 1 {
+		return "", os.ErrInvalid
+	}
+	tw := thumbMaxWidth
+	if tw > w {
+		tw = w
+	}
+	th := h * tw / w
+	if th < 1 {
+		th = 1
+	}
+	dstImg := image.NewRGBA(image.Rect(0, 0, tw, th))
+	draw.CatmullRom.Scale(dstImg, dstImg.Bounds(), img, b, draw.Over, nil)
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(dst), "thumb-*")
+	if err != nil {
+		return "", err
+	}
+	tmpPath := tmp.Name()
+	if err := jpeg.Encode(tmp, dstImg, &jpeg.Options{Quality: 82}); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return "", err
+	}
+	tmp.Close()
+	if err := os.Rename(tmpPath, dst); err != nil {
+		os.Remove(tmpPath)
+		return "", err
+	}
+	return dst, nil
 }

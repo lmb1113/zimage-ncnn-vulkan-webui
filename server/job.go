@@ -294,8 +294,10 @@ func (m *Manager) Cancel(id string) bool {
 			m.cancel()
 		}
 	}
+	canceled := j.Status == StatusCanceled
 	if j.Status == StatusQueued {
 		j.Status = StatusCanceled
+		canceled = true
 		now := time.Now()
 		j.EndedAt = &now
 		m.mu.Unlock()
@@ -304,10 +306,10 @@ func (m *Manager) Cancel(id string) bool {
 		return true
 	}
 	m.mu.Unlock()
-	if j.Status == StatusRunning {
+	if canceled {
 		m.persist()
 	}
-	return j.Status == StatusRunning
+	return canceled
 }
 
 func (m *Manager) setRunning(j *Job) {

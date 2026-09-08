@@ -68,6 +68,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/autostart", s.postAutostart)
 
 	mux.HandleFunc("/media/", s.mediaHandler)
+	mux.HandleFunc("GET /media/thumb/", s.mediaThumb)
 	mux.HandleFunc("/uploads/", s.uploadHandler)
 	mux.HandleFunc("/", s.spa)
 
@@ -367,6 +368,18 @@ func (s *Server) postAutostart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true, "enabled": IsAutostartEnabled()})
+}
+
+// mediaThumb 输出图片的缩略图（480px JPEG，首次访问生成并缓存，解码失败回退原图）。
+func (s *Server) mediaThumb(w http.ResponseWriter, r *http.Request) {
+	cfg := GetConfig()
+	name := filepath.Base(strings.TrimPrefix(r.URL.Path, "/media/thumb/"))
+	dst, err := ensureThumb(cfg.OutputDir, name)
+	if err != nil {
+		http.ServeFile(w, r, filepath.Join(cfg.OutputDir, name))
+		return
+	}
+	http.ServeFile(w, r, dst)
 }
 
 func (s *Server) mediaHandler(w http.ResponseWriter, r *http.Request) {

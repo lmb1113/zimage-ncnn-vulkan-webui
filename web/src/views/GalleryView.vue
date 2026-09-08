@@ -54,6 +54,11 @@ const list = computed(() => {
 
 const visibleList = computed(() => list.value.slice(0, visibleCount.value))
 
+// 网格用服务端缩略图（宽 >480 的图），点开详情/灯箱仍是原图
+function thumbUrl(it) {
+  return it.width > 480 ? '/media/thumb/' + encodeURIComponent(it.name) : it.url
+}
+
 function fmtSize(b) {
   if (!b) return '—'
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`
@@ -133,7 +138,7 @@ onMounted(() => {
           :class="{ on: store.selected && store.selected.name === it.name }"
           @click="selectImage(it.name)"
         >
-          <img :src="it.url" :alt="it.name" loading="lazy" />
+          <img :src="thumbUrl(it)" :alt="it.name" loading="lazy" />
           <div class="meta">
             <span class="t">{{ it.prompt || it.name }}</span>
             <span class="s">
