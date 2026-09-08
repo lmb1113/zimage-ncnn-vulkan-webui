@@ -107,6 +107,8 @@ textarea {
   font-size: 13px;
   transition: background 0.15s, border-color 0.15s, opacity 0.15s;
   white-space: nowrap;
+  /* 关键：作为 flex 子项时不允许被压缩高度，避免窗口变矮时按钮被压扁 */
+  flex: none;
 }
 .btn-primary {
   background: var(--ink);

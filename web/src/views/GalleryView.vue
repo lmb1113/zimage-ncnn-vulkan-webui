@@ -279,6 +279,24 @@ onMounted(() => {
   gap: 14px;
   overflow-y: auto;
 }
+/* 窄窗口时详情栏移到列表下方 */
+@media (max-width: 920px) {
+  .view {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .main {
+    padding: 16px;
+  }
+  .grid {
+    overflow: visible;
+  }
+  .detail {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
 .label {
   font-size: 13px;
   color: var(--text-3);

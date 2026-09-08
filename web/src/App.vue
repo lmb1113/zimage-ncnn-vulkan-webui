@@ -215,4 +215,17 @@ onMounted(bootstrap)
 .fade-leave-to {
   opacity: 0;
 }
+/* 窄窗口时收紧顶栏 */
+@media (max-width: 720px) {
+  .topbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .brand .tag {
+    display: none;
+  }
+  .nav-item {
+    padding: 6px 10px;
+  }
+}
 </style>

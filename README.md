@@ -134,11 +134,13 @@ F:\aiimage\z-image-turbo\
 
 ## 从源码构建
 
-依赖：Go 1.22+、Node.js 18+
+依赖：Go 1.22+、Node.js 18+。支持 Windows / Linux / macOS。
 
 ```
 cd webui
-build.bat        # 等价于以下两步
+build.bat        # Windows 一键构建
+./build.sh       # Linux / macOS 一键构建
+./build.sh all   # 交叉编译 Windows / Linux / macOS 全平台产物（输出到 dist/）
 ```
 
 手动构建：
@@ -148,8 +150,21 @@ cd web
 npm install
 npm run build    # 产物输出到 web/dist
 cd ..
-go build -o zimage-webui.exe .
+go build -o zimage-webui.exe .     # Linux/macOS 用 go build -o zimage-webui .
 ```
+
+后端为纯 Go 标准库实现，无 CGO 依赖，可直接交叉编译：
+
+```
+GOOS=windows GOARCH=amd64 go build -o dist/zimage-webui-windows-amd64.exe .
+GOOS=linux   GOARCH=amd64 go build -o dist/zimage-webui-linux-amd64 .
+GOOS=darwin  GOARCH=arm64 go build -o dist/zimage-webui-darwin-arm64 .
+```
+
+> 平台差异说明：开机自启目前仅 Windows 实现（注册表 Run 项），其他平台设置页会提示不支持；
+> 「打开输出目录」与自动打开浏览器在三大平台均已适配。
+
+前端已做窄窗口响应式适配（≤920px 自动切换上下布局），平板与分屏场景可用。
 
 前端通过 `go:embed` 打进二进制；运行时若 exe 同级存在 `web/dist` 目录则优先读磁盘（便于开发热更），否则使用内嵌资源。
 

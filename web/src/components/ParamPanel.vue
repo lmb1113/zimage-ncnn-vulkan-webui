@@ -337,6 +337,17 @@ function reset() {
   gap: 16px;
   overflow-y: auto;
 }
+/* 面板子项不随窗口变矮被压缩：空间不足时改为滚动，保持控件原始高度 */
+.panel > * {
+  flex-shrink: 0;
+}
+@media (max-width: 920px) {
+  .panel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -484,7 +495,7 @@ function reset() {
   font-variant-numeric: tabular-nums;
 }
 .spacer {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 16px;
 }
 .block {

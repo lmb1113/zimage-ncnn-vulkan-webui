@@ -159,6 +159,17 @@ async function openDir(path) {
   flex: none;
   align-self: flex-start;
 }
+/* 窄窗口时侧栏移到主列下方 */
+@media (max-width: 920px) {
+  .view {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .side {
+    width: 100%;
+    align-self: auto;
+  }
+}
 .block-card {
   padding: 20px;
   display: flex;

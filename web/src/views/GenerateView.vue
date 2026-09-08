@@ -80,6 +80,16 @@ function cancel() {
   flex-direction: column;
   gap: 16px;
 }
+/* 窄窗口（平板/分屏）时改为上下布局 */
+@media (max-width: 920px) {
+  .view {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .right {
+    padding: 16px;
+  }
+}
 .status {
   flex: none;
   padding: 14px 16px;
