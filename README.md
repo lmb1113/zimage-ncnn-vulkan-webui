@@ -3,7 +3,7 @@
 基于 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 的本地生图管理与操作前端。
 Go 后端 + Vue3 前端，整体白色调，编译为单个可执行文件，双击即用。
 
-> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.1.0`
+> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.2.0`
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -242,6 +242,20 @@ WDDM 限制 Vulkan 应用只能用一半系统内存，需满足「一半内存 
 - Z-Image 模型：[Tongyi-MAI/Z-Image](https://github.com/Tongyi-MAI/Z-Image)
 - 模型下载：[nihui-szyl/z-image-ncnn](https://huggingface.co/nihui-szyl/z-image-ncnn/tree/main)
 - 重绘管线参考：[scraed/LanPaint](https://github.com/scraed/LanPaint)
+
+## 更新日志
+
+### v0.2.0
+
+- 新增图生图模式（基于 ControlNet 路线，参考图 + 相似强度）
+- 局部重绘内置手绘蒙版编辑器：画笔/橡皮/笔刷大小/撤销/清空，自动按原图分辨率生成蒙版
+- 新增 MIT 开源协议；顶栏版本号与 GitHub 仓库入口
+- 窄窗口响应式布局；新增 Linux/macOS 构建脚本与全平台交叉编译
+- 修复上传接口随机后缀负索引 panic、扩图模式 -s 尺寸冲突
+
+### v0.1.0
+
+- 首个版本：六种生成模式、任务队列与实时进度、图库、设置与环境自检
 
 ## 开源协议
 
