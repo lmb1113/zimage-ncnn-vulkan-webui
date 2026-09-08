@@ -3,7 +3,7 @@
 基于 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 的本地生图管理与操作前端。
 Go 后端 + Vue3 前端，整体白色调，编译为单个可执行文件，双击即用。
 
-> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.2.1`
+> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.2.2`
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -246,6 +246,15 @@ WDDM 限制 Vulkan 应用只能用一半系统内存，需满足「一半内存 
 - 重绘管线参考：[scraed/LanPaint](https://github.com/scraed/LanPaint)
 
 ## 更新日志
+
+### v0.2.2
+
+- 模式标签全中文化：控制生成（原 ControlNet）、图片放大（原 Tile 放大）
+- 支持 Ctrl+V 粘贴剪贴板图片，按模式自动落到对应输入位
+- 图库一键联动扩展到预览区与全屏灯箱；灯箱支持 ←/→ 切图与 n/N 计数
+- 设置页新增「清空上传目录」；状态栏新增「清空排队」
+- 蒙版编辑器快捷键：Ctrl+Z 撤销、[ / ] 调笔刷
+- 修复中文输入法组词时 Ctrl+Enter 误触提交
 
 ### v0.2.1
 
