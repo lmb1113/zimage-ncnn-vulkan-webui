@@ -70,6 +70,18 @@ function fmtElapsed(ms) {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
+// 打包下载当前筛选结果（ZIP）
+function downloadZip() {
+  const names = list.value.map((i) => i.name).join(',')
+  const url = '/api/gallery/download' + (names ? '?names=' + encodeURIComponent(names) : '')
+  const a = document.createElement('a')
+  a.href = url
+  a.download = ''
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
 async function openFolder() {
   try {
     await api.openPath('')
@@ -127,6 +139,7 @@ onMounted(() => {
           <input v-model="keyword" class="search" placeholder="搜索提示词或种子" />
           <button class="btn btn-sm btn-ghost" @click="refreshGallery">刷新</button>
           <button class="btn btn-sm btn-ghost" @click="openFolder">打开目录</button>
+          <button class="btn btn-sm btn-ghost" title="把当前筛选结果打包为 ZIP" @click="downloadZip">下载 ZIP</button>
         </div>
       </div>
 

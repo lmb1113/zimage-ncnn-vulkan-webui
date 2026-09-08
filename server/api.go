@@ -1,6 +1,7 @@
 package server
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -61,6 +62,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/uploads/clear", s.clearUploads)
 	mux.HandleFunc("GET /api/gallery", s.gallery)
 	mux.HandleFunc("GET /api/gallery/{name}", s.galleryDetail)
+	mux.HandleFunc("GET /api/gallery/download", s.galleryDownload)
 	mux.HandleFunc("DELETE /api/gallery/{name}", s.galleryDelete)
 
 	mux.HandleFunc("POST /api/open", s.openPath)
@@ -260,6 +262,53 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 
 // randSuffix 生成随机文件名后缀。
 // 使用标准库随机数；此前手写 LCG 因 int64 溢出产生负数导致负索引 panic（上传接口崩溃）。
+// galleryDownload 把指定图片（names 逗号分隔；缺省为全部）打包成 ZIP 下载。
+func (s *Server) galleryDownload(w http.ResponseWriter, r *http.Request) {
+	cfg := GetConfig()
+	q := strings.Trim(r.URL.Query().Get("names"), ",")
+	var names []string
+	if q == "" {
+		entries, err := os.ReadDir(cfg.OutputDir)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		for _, e := range entries {
+			if !e.IsDir() && isImage(e.Name()) {
+				names = append(names, e.Name())
+			}
+		}
+	} else {
+		for _, n := range strings.Split(q, ",") {
+			if n = strings.TrimSpace(n); n != "" {
+				names = append(names, n)
+			}
+		}
+	}
+	if len(names) == 0 {
+		writeErr(w, http.StatusBadRequest, "没有可下载的图片")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition",
+		`attachment; filename="z-image-`+time.Now().Format("20060102-150405")+`.zip"`)
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+	for _, name := range names {
+		name = filepath.Base(name) // 防路径穿越
+		src, err := os.Open(filepath.Join(cfg.OutputDir, name))
+		if err != nil {
+			continue // 单个缺失不影响整体
+		}
+		fw, err := zw.Create(name)
+		if err == nil {
+			_, _ = io.Copy(fw, src)
+		}
+		src.Close()
+	}
+}
+
 // clearUploads 清空上传目录（仅删文件，不动目录结构）。
 func (s *Server) clearUploads(w http.ResponseWriter, r *http.Request) {
 	cfg := GetConfig()

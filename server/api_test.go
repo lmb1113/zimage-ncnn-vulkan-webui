@@ -1,6 +1,7 @@
 package server
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"image"
@@ -155,6 +156,43 @@ func TestGalleryRoundTrip(t *testing.T) {
 	rec, _ = doJSON(t, srv, "GET", "/api/gallery/"+name, nil)
 	if rec.Code != 404 {
 		t.Errorf("删除后详情应 404，实际 %d", rec.Code)
+	}
+}
+
+// ---------- /api/gallery/download ZIP 打包 ----------
+
+func TestGalleryDownloadZip(t *testing.T) {
+	srv := newTestServer(t)
+	cfg := GetConfig()
+	if err := os.MkdirAll(cfg.OutputDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestPNG(t, filepath.Join(cfg.OutputDir, "a.png"), 2, 2)
+	writeTestPNG(t, filepath.Join(cfg.OutputDir, "b.png"), 2, 2)
+
+	rec, _ := doJSON(t, srv, "GET", "/api/gallery/download", nil)
+	if rec.Code != 200 {
+		t.Fatalf("下载应成功: %d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/zip" {
+		t.Errorf("Content-Type 应为 application/zip，实际 %q", ct)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
+	if err != nil {
+		t.Fatalf("不是有效 ZIP: %v", err)
+	}
+	if len(zr.File) != 2 {
+		t.Errorf("ZIP 应含 2 个文件，实际 %d", len(zr.File))
+	}
+
+	// 指定 names 只打包对应文件；不存在的名字自动跳过
+	rec2, _ := doJSON(t, srv, "GET", "/api/gallery/download?names=a.png,missing.png", nil)
+	zr2, err := zip.NewReader(bytes.NewReader(rec2.Body.Bytes()), int64(rec2.Body.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(zr2.File) != 1 || zr2.File[0].Name != "a.png" {
+		t.Errorf("指定 names 应只含 a.png，实际 %d 个", len(zr2.File))
 	}
 }
 
