@@ -17,6 +17,7 @@ import (
 type GalleryItem struct {
 	Name      string `json:"name"`
 	URL       string `json:"url"`
+	Path      string `json:"path,omitempty"` // 服务端绝对路径，供一键联动复用
 	Size      int64  `json:"size"`
 	Width     int    `json:"width"`
 	Height    int    `json:"height"`
@@ -105,6 +106,7 @@ func ListGallery() []GalleryItem {
 		it := GalleryItem{
 			Name:    e.Name(),
 			URL:     "/media/" + e.Name(),
+			Path:    filepath.Join(cfg.OutputDir, e.Name()),
 			Size:    info.Size(),
 			ModTime: info.ModTime().Format("2006-01-02 15:04:05"),
 		}
@@ -152,6 +154,7 @@ func GalleryDetail(name string) (GalleryItem, bool) {
 	it := GalleryItem{
 		Name:    clean,
 		URL:     "/media/" + clean,
+		Path:    filepath.Join(cfg.OutputDir, clean),
 		Size:    st.Size(),
 		ModTime: st.ModTime().Format("2006-01-02 15:04:05"),
 	}

@@ -80,6 +80,50 @@ function reuse() {
   notify('参数已带回到生成工作台')
 }
 
+// 一键联动：把当前图作为图生图参考图
+function useAsImg2img() {
+  const it = store.selected
+  if (!it || !it.path) return
+  store.pendingParams = {
+    mode: 'img2img',
+    previews: { controlImage: it.url },
+    controlImage: it.path,
+    prompt: '',
+    negative: '',
+    width: it.width || 1024,
+    height: it.height || 1024,
+    steps: 0,
+    seed: -1,
+    batch: 1,
+    controlScale: 1.0,
+    inputImage: '',
+    maskImage: '',
+  }
+  store.view = 'generate'
+  notify('已切换到图生图，参考图已就位')
+}
+
+// 一键联动：把当前图作为局部重绘输入图
+function useAsInpaint() {
+  const it = store.selected
+  if (!it || !it.path) return
+  store.pendingParams = {
+    mode: 'inpaint',
+    previews: { inputImage: it.url },
+    inputImage: it.path,
+    maskImage: '',
+    prompt: '',
+    negative: '',
+    width: it.width || 1024,
+    height: it.height || 1024,
+    steps: 0,
+    seed: -1,
+    batch: 1,
+  }
+  store.view = 'generate'
+  notify('已切换到局部重绘，输入图已就位')
+}
+
 onMounted(() => {
   if (!store.selected && store.gallery.length) selectImage(store.gallery[0].name)
 })
@@ -163,6 +207,10 @@ onMounted(() => {
 
         <button class="btn btn-primary block" @click="openFolder">打开所在文件夹</button>
         <button class="btn btn-ghost block" @click="reuse">复用参数重新生成</button>
+        <div class="link-row">
+          <button class="btn btn-ghost" @click="useAsImg2img">作为图生图参考</button>
+          <button class="btn btn-ghost" @click="useAsInpaint">作为重绘输入</button>
+        </div>
         <button class="btn btn-danger block" @click="removeImage(store.selected.name)">
           删除这张图片
         </button>
@@ -352,5 +400,13 @@ onMounted(() => {
 }
 .sub {
   display: block;
+}
+.link-row {
+  display: flex;
+  gap: 8px;
+}
+.link-row .btn {
+  flex: 1;
+  white-space: nowrap;
 }
 </style>

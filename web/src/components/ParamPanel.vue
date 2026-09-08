@@ -62,9 +62,18 @@ watch(
   () => store.pendingParams,
   (p) => {
     if (!p) return
-    Object.assign(params, p)
+    // 支持联动携带目标模式与图片预览（图生图参考图 / 重绘输入图）
+    const { mode: m, previews: pv, ...rest } = p
+    Object.assign(params, rest)
+    if (m) mode.value = m
+    if (pv) {
+      Object.assign(previews, pv)
+      if (pv.inputImage) syncInputSize(pv.inputImage)
+    }
     store.pendingParams = null
-  }
+  },
+  // immediate：图库页设置 pendingParams 时本组件尚未挂载，挂载后需立即消费一次
+  { immediate: true }
 )
 
 function setPreset(p) {
