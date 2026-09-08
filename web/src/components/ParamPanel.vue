@@ -43,6 +43,20 @@ const mode = ref('txt2img')
 const previews = reactive({})
 const showAdvanced = ref(false)
 const maskEditor = ref(null)
+const inputDims = reactive({ w: 0, h: 0 })
+
+// 扩图后的最终画布：原图尺寸 + 左/上/右/下边距
+const expandedSize = computed(() => {
+  if (!inputDims.w || mode.value !== 'outpaint') return ''
+  const m = String(params.outpaint || '')
+    .split(',')
+    .map((v) => parseInt(v, 10) || 0)
+  const l = m[0] || 0
+  const t = m[1] || 0
+  const r = m[2] || 0
+  const b = m[3] || 0
+  return `${inputDims.w + l + r} × ${inputDims.h + t + b}`
+})
 
 watch(
   () => store.pendingParams,
@@ -79,6 +93,8 @@ function syncInputSize(url) {
   const im = new Image()
   im.onload = () => {
     if (im.naturalWidth > 0) {
+      inputDims.w = im.naturalWidth
+      inputDims.h = im.naturalHeight
       params.width = im.naturalWidth
       params.height = im.naturalHeight
     }
@@ -242,6 +258,7 @@ function reset() {
       </button>
       <div class="row-between">
         <span class="field-label">扩展 左,上,右,下</span>
+        <span v-if="expandedSize" class="value">扩展后 {{ expandedSize }}</span>
       </div>
       <input v-model="params.outpaint" placeholder="128,128,128,128" />
     </div>

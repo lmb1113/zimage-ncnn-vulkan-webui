@@ -282,7 +282,9 @@ func BuildArgs(j *Job, outPath string) []string {
 		a = append(a, "-n", strings.TrimSpace(p.Negative))
 	}
 	a = append(a, "-o", outPath)
-	if p.Width > 0 && p.Height > 0 {
+	// 扩图：引擎按「原图 + -x 边距」自行推导画布，README 示例也不传 -s，
+	// 传入与扩展后尺寸不符的 -s 会导致引擎崩溃，因此该模式跳过 -s。
+	if p.Width > 0 && p.Height > 0 && j.Mode != "outpaint" {
 		a = append(a, "-s", fmt.Sprintf("%d,%d", p.Width, p.Height))
 	}
 	if p.Steps > 0 {
