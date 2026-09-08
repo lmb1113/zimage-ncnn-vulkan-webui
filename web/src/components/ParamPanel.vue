@@ -2,6 +2,7 @@
 import { reactive, ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { store, notify, isBusy, activeJob } from '../store'
+import MaskEditor from './MaskEditor.vue'
 
 const modes = [
   { key: 'txt2img', label: '文生图' },
@@ -40,6 +41,7 @@ const params = reactive({
 const mode = ref('txt2img')
 const previews = reactive({})
 const showAdvanced = ref(false)
+const maskEditor = ref(null)
 
 watch(
   () => store.pendingParams,
@@ -64,10 +66,23 @@ async function uploadFile(file, key) {
     const r = await api.upload(file)
     params[key] = r.path
     previews[key] = r.url
+    // 局部重绘的输入图：输出尺寸自动对齐原图，避免引擎尺寸冲突
+    if (key === 'inputImage') syncInputSize(r.url)
     notify(`已上传 ${file.name}`, 'success')
   } catch (e) {
     notify(e.message, 'error')
   }
+}
+
+function syncInputSize(url) {
+  const im = new Image()
+  im.onload = () => {
+    if (im.naturalWidth > 0) {
+      params.width = im.naturalWidth
+      params.height = im.naturalHeight
+    }
+  }
+  im.src = url
 }
 
 function pickFile(key) {
@@ -96,6 +111,21 @@ const canSubmit = computed(() => !isBusy.value && params.prompt.trim() !== '')
 
 async function submit() {
   if (!canSubmit.value) return
+  // 局部重绘：先把画布涂抹导出为蒙版并上传，再提交任务
+  if (mode.value === 'inpaint' && previews.inputImage && maskEditor.value) {
+    if (maskEditor.value.hasStrokes()) {
+      try {
+        const f = await maskEditor.value.exportMask()
+        const r = await api.upload(f)
+        params.maskImage = r.path
+      } catch (e) {
+        notify('蒙版生成失败：' + e.message, 'error')
+        return
+      }
+    } else {
+      params.maskImage = ''
+    }
+  }
   const payload = { ...params }
   if (mode.value === 'tile') payload.tileUpscale = true
   try {
@@ -128,6 +158,7 @@ function reset() {
     controlScale: 1.0,
   })
   for (const k of Object.keys(previews)) delete previews[k]
+  if (maskEditor.value) maskEditor.value.clear()
 }
 </script>
 
@@ -178,15 +209,21 @@ function reset() {
         <img v-if="previews.inputImage" :src="previews.inputImage" alt="" />
         <span v-else>上传输入图像 · -i（可拖入）</span>
       </button>
+      <!-- 已有原图：内嵌手绘蒙版编辑器，替代上传遮罩 -->
+      <MaskEditor
+        v-if="previews.inputImage"
+        ref="maskEditor"
+        :src="previews.inputImage"
+      />
       <button
+        v-else
         class="uploader"
         title="点击选择或拖入遮罩"
         @click="pickFile('maskImage')"
         @dragover.prevent
         @drop.prevent="onDrop($event, 'maskImage')"
       >
-        <img v-if="previews.maskImage" :src="previews.maskImage" alt="" />
-        <span v-else>上传遮罩图 · 白=重绘 黑=保留</span>
+        <span>上传遮罩图 · 白=重绘 黑=保留</span>
       </button>
     </div>
 
