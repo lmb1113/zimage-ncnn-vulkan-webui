@@ -50,6 +50,26 @@ const foundModels = computed(() =>
   ((store.system && store.system.models) || []).filter((m) => m.found)
 )
 
+// 提示词历史：取自图库元数据（去重、最新在前、最多 20 条）
+const showHistory = ref(false)
+const promptHistory = computed(() => {
+  const seen = new Set()
+  const out = []
+  for (const it of store.gallery) {
+    const p = (it.prompt || '').trim()
+    if (!p || seen.has(p)) continue
+    seen.add(p)
+    out.push(p)
+    if (out.length >= 20) break
+  }
+  return out
+})
+
+function applyHistory(p) {
+  params.prompt = p
+  showHistory.value = false
+}
+
 // 扩图后的最终画布：原图尺寸 + 左/上/右/下边距
 const expandedSize = computed(() => {
   if (!inputDims.w || mode.value !== 'outpaint') return ''
@@ -239,7 +259,27 @@ function reset() {
     <div class="group">
       <div class="row-between">
         <span class="field-label">提示词</span>
-        <span class="counter">{{ params.prompt.length }} 字</span>
+        <div class="prompt-tools">
+          <span class="counter">{{ params.prompt.length }} 字</span>
+          <button
+            v-if="promptHistory.length"
+            class="hist-btn"
+            @click="showHistory = !showHistory"
+          >
+            历史 {{ promptHistory.length }}
+          </button>
+        </div>
+      </div>
+      <div v-if="showHistory && promptHistory.length" class="hist-panel">
+        <button
+          v-for="(p, i) in promptHistory"
+          :key="i"
+          class="hist-item"
+          :title="p"
+          @click="applyHistory(p)"
+        >
+          {{ p }}
+        </button>
       </div>
       <textarea
         v-model="params.prompt"
@@ -502,6 +542,47 @@ function reset() {
 .counter {
   font-size: 11px;
   color: var(--muted);
+}
+.prompt-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hist-btn {
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--tint);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+}
+.hist-btn:hover {
+  color: var(--text);
+}
+.hist-panel {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: #fff;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.hist-item {
+  text-align: left;
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hist-item:last-child {
+  border-bottom: none;
+}
+.hist-item:hover {
+  background: var(--tint-2);
+  color: var(--text);
 }
 .inline {
   display: flex;
