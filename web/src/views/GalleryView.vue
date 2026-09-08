@@ -115,6 +115,15 @@ function useAsInpaint() {
   reuseImage(store.selected, 'inpaint')
 }
 
+// 删除是不可恢复的磁盘操作，必须二次确认
+function confirmDelete() {
+  const it = store.selected
+  if (!it) return
+  if (confirm('确定删除这张图片？\n' + it.name + '\n\n将从磁盘移除且无法恢复。')) {
+    removeImage(it.name)
+  }
+}
+
 onMounted(() => {
   if (!store.selected && store.gallery.length) selectImage(store.gallery[0].name)
 })
@@ -209,7 +218,11 @@ onMounted(() => {
           <button class="btn btn-ghost" @click="useAsImg2img">作为图生图参考</button>
           <button class="btn btn-ghost" @click="useAsInpaint">作为重绘输入</button>
         </div>
-        <button class="btn btn-danger block" @click="removeImage(store.selected.name)">
+        <button
+          class="btn btn-danger block"
+          title="将从磁盘删除该图片，不可恢复"
+          @click="confirmDelete"
+        >
           删除这张图片
         </button>
       </template>
