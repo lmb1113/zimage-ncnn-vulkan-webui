@@ -133,8 +133,31 @@ function onDrop(e, key) {
 function onKey(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canSubmit.value) submit()
 }
-onMounted(() => window.addEventListener('keydown', onKey))
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+
+// Ctrl+V 粘贴剪贴板图片：按当前模式自动落到对应输入位
+function onPaste(e) {
+  const files = (e.clipboardData && e.clipboardData.files) || []
+  const img = Array.from(files).find((f) => f.type.startsWith('image/'))
+  if (!img) return
+  let key = ''
+  if (mode.value === 'inpaint') key = previews.inputImage ? '' : 'inputImage'
+  else if (mode.value === 'outpaint') key = 'inputImage'
+  else if (mode.value === 'img2img' || mode.value === 'controlnet' || mode.value === 'tile') key = 'controlImage'
+  if (!key) {
+    if (mode.value !== 'txt2img') notify('该输入位已有图片', 'info')
+    return
+  }
+  e.preventDefault()
+  uploadFile(img, key)
+}
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  window.addEventListener('paste', onPaste)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('paste', onPaste)
+})
 
 const canSubmit = computed(() => !isBusy.value && params.prompt.trim() !== '')
 
@@ -237,7 +260,7 @@ function reset() {
         @drop.prevent="onDrop($event, 'inputImage')"
       >
         <img v-if="previews.inputImage" :src="previews.inputImage" alt="" />
-        <span v-else>上传输入图像 · -i（可拖入）</span>
+        <span v-else>上传输入图像 · -i（可拖入 / Ctrl+V 粘贴）</span>
       </button>
       <!-- 已有原图：内嵌手绘蒙版编辑器，替代上传遮罩 -->
       <MaskEditor
@@ -288,7 +311,7 @@ function reset() {
           mode === 'tile'
             ? '上传低分辨率图（放大到目标尺寸）'
             : mode === 'img2img'
-              ? '上传参考图 · -c（可拖入）'
+              ? '上传参考图 · -c（可拖入 / Ctrl+V）'
               : '上传控制图（姿态/线稿/灰度）'
         }}</span>
       </button>
