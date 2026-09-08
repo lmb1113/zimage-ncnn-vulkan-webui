@@ -422,6 +422,7 @@ func (s *Server) postAutostart(w http.ResponseWriter, r *http.Request) {
 // mediaThumb 输出图片的缩略图（480px JPEG，首次访问生成并缓存，解码失败回退原图）。
 func (s *Server) mediaThumb(w http.ResponseWriter, r *http.Request) {
 	cfg := GetConfig()
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	name := filepath.Base(strings.TrimPrefix(r.URL.Path, "/media/thumb/"))
 	dst, err := ensureThumb(cfg.OutputDir, name)
 	if err != nil {
@@ -433,12 +434,14 @@ func (s *Server) mediaThumb(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) mediaHandler(w http.ResponseWriter, r *http.Request) {
 	cfg := GetConfig()
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	name := filepath.Base(strings.TrimPrefix(r.URL.Path, "/media/"))
 	http.ServeFile(w, r, filepath.Join(cfg.OutputDir, name))
 }
 
 func (s *Server) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	cfg := GetConfig()
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	name := filepath.Base(strings.TrimPrefix(r.URL.Path, "/uploads/"))
 	http.ServeFile(w, r, filepath.Join(cfg.UploadDir, name))
 }

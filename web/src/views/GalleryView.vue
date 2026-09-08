@@ -179,7 +179,7 @@ onMounted(() => {
         <span class="label">图片详情</span>
         <img
           class="thumb"
-          :src="store.selected.url"
+          :src="thumbUrl(store.selected)"
           :alt="store.selected.name"
           title="点击放大"
           @click="openLightbox(store.selected.url, list.map((i) => i.url))"

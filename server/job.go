@@ -599,9 +599,7 @@ func pump(r io.Reader, fn func(string)) {
 		if len(chunk) > 0 {
 			for _, part := range strings.Split(chunk, "\r") {
 				part = strings.TrimRight(part, "\n")
-				if strings.TrimSpace(part) != "" {
-					fn(part)
-				} else if part != "" {
+				if part != "" {
 					fn(part)
 				}
 			}
