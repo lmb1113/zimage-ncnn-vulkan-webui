@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"math/rand/v2"
 )
 
 // Server 聚合了任务管理器、事件总线与前端资源（磁盘优先，其次内嵌）。
@@ -247,13 +249,13 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// randSuffix 生成随机文件名后缀。
+// 使用标准库随机数；此前手写 LCG 因 int64 溢出产生负数导致负索引 panic（上传接口崩溃）。
 func randSuffix(n int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, n)
-	seed := time.Now().UnixNano()
 	for i := range b {
-		seed = seed*1103515245 + 12345
-		b[i] = chars[int((seed>>16)%int64(len(chars)))]
+		b[i] = chars[rand.IntN(len(chars))]
 	}
 	return string(b)
 }
