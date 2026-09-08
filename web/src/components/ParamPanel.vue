@@ -82,7 +82,10 @@ async function uploadFile(file, key) {
     params[key] = r.path
     previews[key] = r.url
     // 输入图 / 参考图：输出尺寸自动对齐原图，避免引擎尺寸冲突
-    if (key === 'inputImage' || key === 'controlImage') syncInputSize(r.url)
+    // Tile 放大除外——-s 是放大目标尺寸，必须由用户指定
+    if (key === 'inputImage' || (key === 'controlImage' && mode.value !== 'tile')) {
+      syncInputSize(r.url)
+    }
     notify(`已上传 ${file.name}`, 'success')
   } catch (e) {
     notify(e.message, 'error')
