@@ -50,24 +50,28 @@ const foundModels = computed(() =>
   ((store.system && store.system.models) || []).filter((m) => m.found)
 )
 
-// 提示词历史：取自图库元数据（去重、最新在前、最多 20 条）
-const showHistory = ref(false)
-const promptHistory = computed(() => {
+// 提示词历史：取自图库元数据（去重、最新在前、最多 20 条），正向/反向通用
+const historyField = ref('') // '' | 'prompt' | 'negative'
+function toggleHistory(field) {
+  historyField.value = historyField.value === field ? '' : field
+}
+function historyItems(field) {
+  const key = field === 'negative' ? 'negative' : 'prompt'
   const seen = new Set()
   const out = []
   for (const it of store.gallery) {
-    const p = (it.prompt || '').trim()
+    const p = (it[key] || '').trim()
     if (!p || seen.has(p)) continue
     seen.add(p)
     out.push(p)
     if (out.length >= 20) break
   }
   return out
-})
+}
 
-function applyHistory(p) {
-  params.prompt = p
-  showHistory.value = false
+function applyHistory(field, p) {
+  params[field] = p
+  historyField.value = ''
 }
 
 // 扩图后的最终画布：原图尺寸 + 左/上/右/下边距
@@ -263,21 +267,21 @@ function reset() {
         <div class="prompt-tools">
           <span class="counter">{{ params.prompt.length }} 字</span>
           <button
-            v-if="promptHistory.length"
+            v-if="historyItems('prompt').length"
             class="hist-btn"
-            @click="showHistory = !showHistory"
+            @click="toggleHistory('prompt')"
           >
-            历史 {{ promptHistory.length }}
+            历史 {{ historyItems('prompt').length }}
           </button>
         </div>
       </div>
-      <div v-if="showHistory && promptHistory.length" class="hist-panel">
+      <div v-if="historyField === 'prompt'" class="hist-panel">
         <button
-          v-for="(p, i) in promptHistory"
+          v-for="(p, i) in historyItems('prompt')"
           :key="i"
           class="hist-item"
           :title="p"
-          @click="applyHistory(p)"
+          @click="applyHistory('prompt', p)"
         >
           {{ p }}
         </button>
@@ -290,7 +294,27 @@ function reset() {
     </div>
 
     <div class="group">
-      <span class="field-label">反向提示词</span>
+      <div class="row-between">
+        <span class="field-label">反向提示词</span>
+        <button
+          v-if="historyItems('negative').length"
+          class="hist-btn"
+          @click="toggleHistory('negative')"
+        >
+          历史 {{ historyItems('negative').length }}
+        </button>
+      </div>
+      <div v-if="historyField === 'negative'" class="hist-panel">
+        <button
+          v-for="(p, i) in historyItems('negative')"
+          :key="i"
+          class="hist-item"
+          :title="p"
+          @click="applyHistory('negative', p)"
+        >
+          {{ p }}
+        </button>
+      </div>
       <textarea
         v-model="params.negative"
         rows="2"
@@ -406,13 +430,24 @@ function reset() {
 
       <div class="row-between">
         <span class="field-label">采样步数</span>
-        <input class="num" v-model.number="params.steps" type="number" min="0" />
+        <input
+          class="num"
+          v-model.number="params.steps"
+          type="number"
+          min="0"
+          title="0 = 自动（由引擎决定）"
+        />
       </div>
 
       <div class="row-between">
         <span class="field-label">随机种子</span>
         <div class="inline">
-          <input class="num wide" v-model.number="params.seed" type="number" />
+          <input
+            class="num wide"
+            v-model.number="params.seed"
+            type="number"
+            title="≥0 固定种子复现结果，-1 = 随机"
+          />
           <button class="icon-btn" title="随机" @click="randomSeed">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <rect
