@@ -33,7 +33,14 @@ jobs:
           npm run build
 
       - name: 单元测试
-        run: go test ./... -v
+        run: go test ./... -v 2>&1 | tee test-output.log
+
+      - name: 上传测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: test-output.log
 
       - name: 编译（嵌入前端产物）
         run: go build -trimpath -ldflags "-s -w" -o zimage-webui.exe .
