@@ -57,6 +57,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events", s.events)
 
 	mux.HandleFunc("POST /api/upload", s.upload)
+	mux.HandleFunc("POST /api/uploads/clear", s.clearUploads)
 	mux.HandleFunc("GET /api/gallery", s.gallery)
 	mux.HandleFunc("GET /api/gallery/{name}", s.galleryDetail)
 	mux.HandleFunc("DELETE /api/gallery/{name}", s.galleryDelete)
@@ -253,6 +254,26 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 
 // randSuffix 生成随机文件名后缀。
 // 使用标准库随机数；此前手写 LCG 因 int64 溢出产生负数导致负索引 panic（上传接口崩溃）。
+// clearUploads 清空上传目录（仅删文件，不动目录结构）。
+func (s *Server) clearUploads(w http.ResponseWriter, r *http.Request) {
+	cfg := GetConfig()
+	entries, err := os.ReadDir(cfg.UploadDir)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	removed := 0
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if os.Remove(filepath.Join(cfg.UploadDir, e.Name())) == nil {
+			removed++
+		}
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "removed": removed})
+}
+
 func randSuffix(n int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, n)

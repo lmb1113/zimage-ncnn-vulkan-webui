@@ -64,6 +64,16 @@ async function openDir(path) {
     notify(e.message, 'error')
   }
 }
+
+async function clearUploads() {
+  if (!confirm('确定清空上传目录？目录内全部图片将被删除，不影响已生成的结果图。')) return
+  try {
+    const r = await api.clearUploads()
+    notify(`已清理 ${r.removed} 个上传文件`, 'success')
+  } catch (e) {
+    notify(e.message, 'error')
+  }
+}
 </script>
 
 <template>
@@ -103,6 +113,10 @@ async function openDir(path) {
           <span>上传目录（输入图 / 遮罩 / 控制图）</span>
           <input v-model="form.uploadDir" placeholder="F:\aiimage\uploads" />
         </label>
+        <div class="upload-actions">
+          <button class="btn btn-sm btn-ghost" @click="openDir(form.uploadDir)">打开</button>
+          <button class="btn btn-sm btn-ghost danger" @click="clearUploads">清空上传目录</button>
+        </div>
       </section>
 
       <section class="card block-card">
@@ -215,6 +229,14 @@ async function openDir(path) {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.upload-actions {
+  display: flex;
+  gap: 8px;
+}
+.upload-actions .danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 h3 {
   margin: 0;

@@ -213,6 +213,7 @@ webui/
 | POST | `/api/jobs/{id}/cancel` | 取消任务 |
 | GET | `/api/events` | SSE 实时事件（任务状态 + 日志） |
 | POST | `/api/upload` | 上传图片 |
+| POST | `/api/uploads/clear` | 清空上传目录 |
 | GET | `/api/gallery` | 图库列表 |
 | GET / DELETE | `/api/gallery/{name}` | 图片详情 / 删除 |
 | POST | `/api/open` | 在资源管理器中打开目录 |

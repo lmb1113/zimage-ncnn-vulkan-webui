@@ -44,6 +44,8 @@ export default {
   deleteImage: (name) =>
     req(`/api/gallery/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 
+  clearUploads: () => req('/api/uploads/clear', { method: 'POST' }),
+
   openPath: (path) =>
     req('/api/open', {
       method: 'POST',
