@@ -262,7 +262,7 @@ function reset() {
         @drop.prevent="onDrop($event, 'inputImage')"
       >
         <img v-if="previews.inputImage" :src="previews.inputImage" alt="" />
-        <span v-else>上传输入图像 · -i（可拖入 / Ctrl+V 粘贴）</span>
+        <span v-else>上传输入图像（可拖入 / Ctrl+V 粘贴）</span>
       </button>
       <!-- 已有原图：内嵌手绘蒙版编辑器，替代上传遮罩 -->
       <MaskEditor
@@ -291,7 +291,7 @@ function reset() {
         @drop.prevent="onDrop($event, 'inputImage')"
       >
         <img v-if="previews.inputImage" :src="previews.inputImage" alt="" />
-        <span v-else>上传输入图像 · -i（可拖入）</span>
+        <span v-else>上传输入图像（可拖入）</span>
       </button>
       <div class="row-between">
         <span class="field-label">扩展 左,上,右,下</span>
@@ -313,13 +313,13 @@ function reset() {
           mode === 'tile'
             ? '上传低分辨率图（放大到目标尺寸）'
             : mode === 'img2img'
-              ? '上传参考图 · -c（可拖入 / Ctrl+V）'
+              ? '上传参考图（可拖入 / Ctrl+V）'
               : '上传控制图（姿态/线稿/灰度）'
         }}</span>
       </button>
       <div class="row-between">
         <span class="field-label">
-          {{ mode === 'img2img' ? '相似强度 · -w' : '控制强度 · -w' }}
+          {{ mode === 'img2img' ? '相似强度' : '控制强度' }}
         </span>
         <span class="value">{{ params.controlScale.toFixed(2) }}</span>
       </div>
@@ -359,12 +359,12 @@ function reset() {
       </div>
 
       <div class="row-between">
-        <span class="field-label">采样步数 · -l</span>
+        <span class="field-label">采样步数</span>
         <input class="num" v-model.number="params.steps" type="number" min="0" />
       </div>
 
       <div class="row-between">
-        <span class="field-label">随机种子 · -r</span>
+        <span class="field-label">随机种子</span>
         <div class="inline">
           <input class="num wide" v-model.number="params.seed" type="number" />
           <button class="icon-btn" title="随机" @click="randomSeed">
@@ -387,7 +387,7 @@ function reset() {
       </div>
 
       <div class="row-between">
-        <span class="field-label">批量张数 · -b</span>
+        <span class="field-label">批量张数</span>
         <div class="stepper">
           <button @click="params.batch = Math.max(1, params.batch - 1)">−</button>
           <span>{{ params.batch }}</span>
@@ -401,11 +401,11 @@ function reset() {
 
       <template v-if="showAdvanced">
         <div class="row-between">
-          <span class="field-label">模型路径 · -m</span>
+          <span class="field-label">模型路径</span>
           <input class="num wide" v-model="params.modelPath" placeholder="z-image-turbo" />
         </div>
         <div class="row-between">
-          <span class="field-label">计算设备 · -g</span>
+          <span class="field-label">计算设备</span>
           <select class="num wide" v-model.number="params.gpuId">
             <option :value="-2">自动</option>
             <option :value="-1">CPU</option>

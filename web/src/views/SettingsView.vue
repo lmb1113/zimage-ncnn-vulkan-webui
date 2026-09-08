@@ -123,11 +123,11 @@ async function clearUploads() {
         <h3>默认参数</h3>
         <div class="two">
           <label>
-            <span>默认模型 · -m</span>
+            <span>默认模型</span>
             <input v-model="form.modelPath" placeholder="z-image-turbo" />
           </label>
           <label>
-            <span>默认设备 · -g</span>
+            <span>默认设备</span>
             <select v-model.number="form.gpuId">
               <option :value="-2">自动</option>
               <option :value="-1">CPU</option>
