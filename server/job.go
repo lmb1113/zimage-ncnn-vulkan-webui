@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"encoding/json"
 	"context"
 	"fmt"
 	"io"
@@ -125,8 +126,66 @@ func NewManager(bus *Bus) *Manager {
 		queue: make(chan *Job, 128),
 		bus:   bus,
 	}
+	m.loadPersisted()
 	go m.worker()
 	return m
+}
+
+// jobsFile 任务历史的持久化位置（输出目录 .meta 下）。
+func jobsFile() string {
+	return filepath.Join(metaDir(GetConfig().OutputDir), "jobs.json")
+}
+
+var persistMu sync.Mutex
+
+// persist 将任务历史原子写入磁盘（提交/状态变更/删除时调用）。
+func (m *Manager) persist() {
+	m.mu.Lock()
+	jobs := make([]*Job, 0, len(m.order))
+	for _, id := range m.order {
+		if j := m.jobs[id]; j != nil {
+			jobs = append(jobs, j)
+		}
+	}
+	m.mu.Unlock()
+
+	b, err := json.Marshal(jobs)
+	if err != nil {
+		return
+	}
+	persistMu.Lock()
+	defer persistMu.Unlock()
+	f := jobsFile()
+	_ = os.MkdirAll(filepath.Dir(f), 0o755)
+	tmp := f + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, f)
+}
+
+// loadPersisted 启动时恢复任务历史；上次未完成的任务标记为中断。
+func (m *Manager) loadPersisted() {
+	b, err := os.ReadFile(jobsFile())
+	if err != nil {
+		return
+	}
+	var jobs []*Job
+	if err := json.Unmarshal(b, &jobs); err != nil {
+		return
+	}
+	m.mu.Lock()
+	for _, j := range jobs {
+		if j.Status == StatusRunning || j.Status == StatusQueued {
+			j.Status = StatusFailed
+			j.Error = "服务重启，任务中断"
+			now := time.Now()
+			j.EndedAt = &now
+		}
+		m.jobs[j.ID] = j
+		m.order = append(m.order, j.ID)
+	}
+	m.mu.Unlock()
 }
 
 // Submit 入队一个新任务。
@@ -159,6 +218,7 @@ func (m *Manager) Submit(p Params, mode string) *Job {
 
 	m.bus.Publish("job", j)
 	m.queue <- j
+	m.persist()
 	return j
 }
 
@@ -198,6 +258,7 @@ func (m *Manager) Delete(id string) {
 	m.order = order
 	m.mu.Unlock()
 	m.bus.Publish("job", &Job{ID: id, Status: "deleted"})
+	m.persist()
 }
 
 // Cancel 取消正在运行或排队中的任务。
@@ -220,9 +281,13 @@ func (m *Manager) Cancel(id string) bool {
 		j.EndedAt = &now
 		m.mu.Unlock()
 		m.bus.Publish("job", j)
+		m.persist()
 		return true
 	}
 	m.mu.Unlock()
+	if j.Status == StatusRunning {
+		m.persist()
+	}
 	return j.Status == StatusRunning
 }
 
@@ -253,6 +318,7 @@ func (m *Manager) finish(j *Job, status, errMsg string) {
 	m.cancel = nil
 	m.mu.Unlock()
 	m.bus.Publish("job", j)
+	m.persist()
 }
 
 func (m *Manager) worker() {
