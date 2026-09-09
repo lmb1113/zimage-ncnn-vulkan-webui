@@ -102,9 +102,9 @@ function redrawMask() {
   c.width = base.width
   c.height = base.height
   const ctx = c.getContext('2d')
-  // 笔迹存的是原始像素：变换 = 平移 × (zoom × 适应比例)
-  const s = img.naturalWidth / baseW
-  ctx.setTransform(zoom * s, 0, 0, zoom * s, panX, panY)
+  // 笔迹存的是原始像素：视图变换 = 缩放 × (适应比例的倒数)
+  const view = (zoom * baseW) / img.naturalWidth
+  ctx.setTransform(view, 0, 0, view, panX, panY)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   for (const st of strokes.value) {
@@ -209,8 +209,8 @@ function drawSegment(st) {
   const pts = st.points
   if (pts.length < 2) return
   const ctx = maskCanvas.value.getContext('2d')
-  const s = img.naturalWidth / baseW
-  ctx.setTransform(zoom * s, 0, 0, zoom * s, panX, panY)
+  const view = (zoom * baseW) / img.naturalWidth
+  ctx.setTransform(view, 0, 0, view, panX, panY)
   ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
   ctx.strokeStyle = 'rgba(255, 86, 86, 0.7)'
   ctx.lineWidth = st.size
@@ -227,8 +227,8 @@ function drawSegment(st) {
 // 落点圆点（增量）
 function drawDot(st) {
   const ctx = maskCanvas.value.getContext('2d')
-  const s = img.naturalWidth / baseW
-  ctx.setTransform(zoom * s, 0, 0, zoom * s, panX, panY)
+  const view = (zoom * baseW) / img.naturalWidth
+  ctx.setTransform(view, 0, 0, view, panX, panY)
   ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
   ctx.fillStyle = 'rgba(255, 86, 86, 0.7)'
   ctx.beginPath()
