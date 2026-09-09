@@ -3,7 +3,7 @@
 基于 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 的本地生图管理与操作前端。
 Go 后端 + Vue3 前端，整体白色调，编译为单个可执行文件，双击即用。
 
-> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.0`
+> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.1`
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -250,6 +250,12 @@ WDDM 限制 Vulkan 应用只能用一半系统内存，需满足「一半内存 
 - 重绘管线参考：[scraed/LanPaint](https://github.com/scraed/LanPaint)
 
 ## 更新日志
+
+### v0.3.1
+
+- 蒙版编辑器：笔刷光标预览圈（实时显示涂抹范围）、重做（Ctrl+Shift+Z / Ctrl+Y）
+- 蒙版画布增量绘制，长笔画会话性能恒定
+- 图库「复制提示词」按钮
 
 ### v0.3.0
 
