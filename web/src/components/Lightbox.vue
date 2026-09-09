@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { store, reuseImage, lightboxNav } from '../store'
+import { store, reuseImage, lightboxNav, notify, refreshGallery } from '../store'
+import api from '../api'
 import CompareSlider from './CompareSlider.vue'
 
 function close() {
@@ -17,6 +18,20 @@ const item = computed(() => {
 
 function act(mode) {
   if (reuseImage(item.value, mode)) close()
+}
+
+async function removeImage() {
+  const it = item.value
+  if (!it) return
+  if (!confirm('确定删除这张图片？将从磁盘移除且无法恢复。')) return
+  try {
+    await api.deleteImage(it.name)
+    close()
+    await refreshGallery()
+    notify('已删除该图片')
+  } catch (e) {
+    notify(e.message, 'error')
+  }
 }
 
 // 全屏对比模式（仅当该图有输入图/参考图时可用）
@@ -72,6 +87,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         >
           {{ showCompare ? '退出对比' : '对比原图' }}
         </button>
+        <button
+          v-if="item"
+          class="lb-btn danger"
+          @click="removeImage"
+        >删除</button>
         <a class="lb-btn" :href="store.lightbox" download>下载原图</a>
       </div>
     </div>
@@ -147,6 +167,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   border-radius: 10px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   cursor: ew-resize;
+}
+.lb-btn.danger:hover {
+  background: #e5484d;
 }
 .lb-btn.on {
   background: #fff;

@@ -1,14 +1,16 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import api from '../api'
-import { store, activeJob, openLightbox, reuseImage } from '../store'
+import { store, activeJob, openLightbox, reuseImage, notify } from '../store'
 import CompareSlider from './CompareSlider.vue'
 
 const idx = ref(0)
 
-const job = computed(
-  () => activeJob.value || store.jobs.find((j) => j.outputs && j.outputs.length) || null
-)
+const job = computed(() => {
+  if (activeJob.value) return activeJob.value
+  // 始终展示最新任务：失败/取消（无输出）也会显示错误与重试入口
+  return store.jobs[0] || null
+})
 
 const outputs = computed(() => {
   const j = job.value
@@ -69,6 +71,22 @@ function pathToUrl(p) {
 
 function toggleCompare() {
   showCompare.value = !showCompare.value
+}
+
+// 失败任务一键重试：原样重发同模式同参数
+const retrying = ref(false)
+async function retryJob() {
+  const j = job.value
+  if (!j || retrying.value) return
+  retrying.value = true
+  try {
+    await api.generate(j.mode, JSON.parse(JSON.stringify(j.params)))
+    notify('已重新提交任务')
+  } catch (e) {
+    notify(e.message, 'error')
+  } finally {
+    retrying.value = false
+  }
 }
 
 const metaText = computed(() => {
@@ -139,6 +157,13 @@ const metaText = computed(() => {
       <div class="foot-left">
         <span class="status">{{ statusText }}</span>
         <span class="meta">{{ metaText || (current ? current.name : '') }}</span>
+        <button
+          v-if="job && job.status === 'failed' && !retrying"
+          class="qa"
+          @click="retryJob"
+        >
+          重试
+        </button>
       </div>
       <div class="foot-right">
         <button v-if="galleryItem" class="qa" title="以这张图为参考生成新画面" @click="reuseImage(galleryItem, 'img2img')">图生图</button>
