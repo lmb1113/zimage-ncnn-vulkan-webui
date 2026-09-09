@@ -33,7 +33,16 @@ jobs:
           npm run build
 
       - name: 单元测试
-        run: go test ./... -v 2>&1 | tee test-output.log
+        run: |
+          go test ./... -v 2>&1 | Tee-Object -FilePath test-output.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            "### go test 失败摘录" | Add-Content $env:GITHUB_STEP_SUMMARY
+            Select-String -Path test-output.log -Pattern "^\s*--- FAIL|^\s*FAIL|panic:" -Context 0,12 |
+              ForEach-Object { $_.Line; $_.Context.PostContext } |
+              Add-Content $env:GITHUB_STEP_SUMMARY
+            exit $code
+          }
 
       - name: 上传测试日志
         if: always()
