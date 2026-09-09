@@ -178,7 +178,7 @@ function down(e) {
     erase: tool.value === 'erase',
   }
   strokes.value.push(current)
-  redrawMask()
+  drawDot(current)
 }
 
 function move(e) {
@@ -197,13 +197,65 @@ function move(e) {
   }
   e.preventDefault()
   current.points.push(toNatural(e.clientX, e.clientY))
-  redrawMask()
+  drawSegment(current)
+  // 绘制中不画光标圈：刚落下的笔迹本身就是宽度预览，避免残影
+}
+
+// 增量绘制：只画最新一段，长笔画会话不随笔画数变卡
+function drawSegment(st) {
+  const pts = st.points
+  if (pts.length < 2) return
+  const ctx = maskCanvas.value.getContext('2d')
+  const s = img.naturalWidth / baseW
+  ctx.setTransform(zoom * s, 0, 0, zoom * s, panX, panY)
+  ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
+  ctx.strokeStyle = 'rgba(255, 86, 86, 0.7)'
+  ctx.lineWidth = st.size
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y)
+  ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y)
+  ctx.stroke()
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+}
+
+// 落点圆点（增量）
+function drawDot(st) {
+  const ctx = maskCanvas.value.getContext('2d')
+  const s = img.naturalWidth / baseW
+  ctx.setTransform(zoom * s, 0, 0, zoom * s, panX, panY)
+  ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
+  ctx.fillStyle = 'rgba(255, 86, 86, 0.7)'
+  ctx.beginPath()
+  ctx.arc(st.points[0].x, st.points[0].y, st.size / 2, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+}
+
+// 光标笔刷预览圈（屏幕坐标系，独立于笔画重绘）
+function drawCursor() {
+  if (!cursorPos || tool.value === 'pan') return
+  const ctx = maskCanvas.value.getContext('2d')
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.arc(cursorPos.x, cursorPos.y, Number(brushSize.value) / 2, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
+  ctx.beginPath()
+  ctx.arc(cursorPos.x, cursorPos.y, Number(brushSize.value) / 2 + 1.5, 0, Math.PI * 2)
+  ctx.stroke()
 }
 
 function up() {
   drawing = false
   panning = false
   current = null
+  redrawMask() // 归一化渲染，消除增量绘制期间的预览圈残留
 }
 
 function onWheel(e) {
