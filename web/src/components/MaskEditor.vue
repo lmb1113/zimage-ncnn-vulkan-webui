@@ -16,6 +16,7 @@ const brushSize = ref(30)
 const tool = ref('brush') // brush | erase | pan
 const zoomPct = ref(100)
 const strokes = ref([]) // { points:[{x,y}], size, erase }，坐标与 size 均为图片原始像素
+const undone = ref([]) // 被撤销的笔画，供重做
 
 let img = new Image()
 let drawing = false
@@ -150,6 +151,7 @@ function load() {
   img = new Image()
   img.onload = () => {
     strokes.value = []
+    undone.value = []
     resetView()
   }
   img.src = props.src
@@ -178,6 +180,7 @@ function down(e) {
     erase: tool.value === 'erase',
   }
   strokes.value.push(current)
+  undone.value = [] // 有新笔画后，之前的重做分支作废
   drawDot(current)
 }
 
@@ -270,12 +273,20 @@ function onWheel(e) {
 }
 
 function undo() {
-  strokes.value.pop()
+  if (!strokes.value.length) return
+  undone.value.push(strokes.value.pop())
+  redrawMask()
+}
+
+function redo() {
+  if (!undone.value.length) return
+  strokes.value.push(undone.value.pop())
   redrawMask()
 }
 
 function clear() {
   strokes.value = []
+  undone.value = []
   redrawMask()
 }
 
@@ -336,7 +347,11 @@ function onKey(e) {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault()
-    undo()
+    if (e.shiftKey) redo()
+    else undo()
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+    e.preventDefault()
+    redo()
   } else if (e.key === '[') {
     brushSize.value = Math.max(6, Number(brushSize.value) - 4)
   } else if (e.key === ']') {
@@ -344,7 +359,7 @@ function onKey(e) {
   }
 }
 
-defineExpose({ hasStrokes, exportMask, clear })
+defineExpose({ hasStrokes, exportMask, clear, redo })
 </script>
 
 <template>
@@ -367,7 +382,8 @@ defineExpose({ hasStrokes, exportMask, clear })
       </div>
       <div class="tools">
         <span class="zoom-label">{{ zoomPct }}%</span>
-        <button class="tbtn" :disabled="!strokes.length" @click="undo">撤销</button>
+        <button class="tbtn" :disabled="!strokes.length" title="Ctrl+Z" @click="undo">撤销</button>
+        <button class="tbtn" :disabled="!undone.length" title="Ctrl+Shift+Z / Ctrl+Y" @click="redo">重做</button>
         <button class="tbtn" :disabled="!strokes.length" @click="clear">清空</button>
         <button class="tbtn" :disabled="zoomPct === 100" @click="resetView">适应</button>
       </div>
@@ -388,7 +404,7 @@ defineExpose({ hasStrokes, exportMask, clear })
       />
     </div>
     <p class="mhint">
-      涂抹需要重绘的区域（红色），提交时自动生成蒙版。滚轮缩放、移动工具平移；Ctrl+Z 撤销、[ / ] 调笔刷
+      涂抹需要重绘的区域（红色），提交时自动生成蒙版。滚轮缩放、移动工具平移；Ctrl+Z 撤销 / Ctrl+Shift+Z 重做、[ / ] 调笔刷
     </p>
   </div>
 </template>
