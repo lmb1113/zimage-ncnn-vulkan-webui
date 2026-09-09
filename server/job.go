@@ -527,6 +527,10 @@ func (m *Manager) run(j *Job) {
 		}
 	}
 
+	// 文生图/图片放大：-s 为用户输入的自由尺寸，统一对齐到 16 的倍数
+	// （其余模式的前置处理已保证对齐，此处为幂等兜底）
+	j.Params.Width, j.Params.Height = roundTo16(j.Params.Width), roundTo16(j.Params.Height)
+
 	outPath := filepath.Join(cfg.OutputDir, j.ID+".png")
 	args := BuildArgs(j, outPath)
 	j.Command = quoteCommand(cfg.ExePath, args)
