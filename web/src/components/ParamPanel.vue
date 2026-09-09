@@ -55,6 +55,17 @@ const historyField = ref('') // '' | 'prompt' | 'negative'
 function toggleHistory(field) {
   historyField.value = historyField.value === field ? '' : field
 }
+// 默认设备/模型跟随设置页：初始化与设置保存后同步
+watch(
+  () => store.system && store.system.config,
+  (c) => {
+    if (!c) return
+    params.gpuId = Number(c.gpuId)
+    if (!params.modelPath) params.modelPath = c.modelPath || 'z-image-turbo'
+  },
+  { immediate: true }
+)
+
 function historyItems(field) {
   const key = field === 'negative' ? 'negative' : 'prompt'
   const seen = new Set()
