@@ -26,6 +26,34 @@ let current = null
 let ro = null
 let cursorPos = null // { x, y } 画布内屏幕坐标，用于笔刷预览圈
 
+// 笔迹统一画在离屏图层（不透明），显示时整体按 MASK_ALPHA 合成一次。
+// 这样拖动时每段线重叠也不累积透明度，全程颜色与松手后一致（恒定半透明）。
+const MASK_ALPHA = 0.7
+const MASK_COLOR = 'rgb(255, 86, 86)'
+let layer = null
+
+function ensureLayer(w, h) {
+  if (!layer) layer = document.createElement('canvas')
+  if (layer.width !== w || layer.height !== h) {
+    layer.width = w
+    layer.height = h
+  }
+  return layer
+}
+
+// 离屏图层 → 显示画布（固定透明度合成一次）+ 光标预览圈
+function composite() {
+  const c = maskCanvas.value
+  if (!c || !layer) return
+  const ctx = c.getContext('2d')
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.clearRect(0, 0, c.width, c.height)
+  ctx.globalAlpha = MASK_ALPHA
+  ctx.drawImage(layer, 0, 0)
+  ctx.globalAlpha = 1
+  drawCursor()
+}
+
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 
@@ -101,7 +129,10 @@ function redrawMask() {
   if (!c || !base || !base.width) return
   c.width = base.width
   c.height = base.height
-  const ctx = c.getContext('2d')
+  const l = ensureLayer(base.width, base.height)
+  const ctx = l.getContext('2d')
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.clearRect(0, 0, l.width, l.height)
   // 笔迹存的是原始像素：视图变换 = 缩放 × (适应比例的倒数)
   const view = (zoom * baseW) / img.naturalWidth
   ctx.setTransform(view, 0, 0, view, panX, panY)
@@ -109,8 +140,8 @@ function redrawMask() {
   ctx.lineJoin = 'round'
   for (const st of strokes.value) {
     ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
-    ctx.strokeStyle = 'rgba(255, 86, 86, 0.7)'
-    ctx.fillStyle = 'rgba(255, 86, 86, 0.7)'
+    ctx.strokeStyle = MASK_COLOR
+    ctx.fillStyle = MASK_COLOR
     ctx.lineWidth = st.size
     ctx.beginPath()
     st.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
@@ -123,19 +154,7 @@ function redrawMask() {
   }
   ctx.globalCompositeOperation = 'source-over'
   ctx.setTransform(1, 0, 0, 1, 0, 0)
-
-  // 笔刷预览圈：跟随光标显示实际涂抹范围
-  if (cursorPos && tool.value !== 'pan') {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.arc(cursorPos.x, cursorPos.y, Number(brushSize.value) / 2, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
-    ctx.beginPath()
-    ctx.arc(cursorPos.x, cursorPos.y, Number(brushSize.value) / 2 + 1.5, 0, Math.PI * 2)
-    ctx.stroke()
-  }
+  composite()
 }
 
 function redrawAll() {
@@ -195,7 +214,7 @@ function move(e) {
   const r = maskCanvas.value.getBoundingClientRect()
   cursorPos = { x: e.clientX - r.left, y: e.clientY - r.top }
   if (!drawing) {
-    redrawMask()
+    composite() // 只需重画光标圈，笔迹图层无需重建
     return
   }
   e.preventDefault()
@@ -207,12 +226,12 @@ function move(e) {
 // 增量绘制：只画最新一段，长笔画会话不随笔画数变卡
 function drawSegment(st) {
   const pts = st.points
-  if (pts.length < 2) return
-  const ctx = maskCanvas.value.getContext('2d')
+  if (pts.length < 2 || !maskCanvas.value) return
+  const ctx = ensureLayer(maskCanvas.value.width, maskCanvas.value.height).getContext('2d')
   const view = (zoom * baseW) / img.naturalWidth
   ctx.setTransform(view, 0, 0, view, panX, panY)
   ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
-  ctx.strokeStyle = 'rgba(255, 86, 86, 0.7)'
+  ctx.strokeStyle = MASK_COLOR
   ctx.lineWidth = st.size
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -222,20 +241,23 @@ function drawSegment(st) {
   ctx.stroke()
   ctx.globalCompositeOperation = 'source-over'
   ctx.setTransform(1, 0, 0, 1, 0, 0)
+  composite()
 }
 
 // 落点圆点（增量）
 function drawDot(st) {
-  const ctx = maskCanvas.value.getContext('2d')
+  if (!maskCanvas.value) return
+  const ctx = ensureLayer(maskCanvas.value.width, maskCanvas.value.height).getContext('2d')
   const view = (zoom * baseW) / img.naturalWidth
   ctx.setTransform(view, 0, 0, view, panX, panY)
   ctx.globalCompositeOperation = st.erase ? 'destination-out' : 'source-over'
-  ctx.fillStyle = 'rgba(255, 86, 86, 0.7)'
+  ctx.fillStyle = MASK_COLOR
   ctx.beginPath()
   ctx.arc(st.points[0].x, st.points[0].y, st.size / 2, 0, Math.PI * 2)
   ctx.fill()
   ctx.globalCompositeOperation = 'source-over'
   ctx.setTransform(1, 0, 0, 1, 0, 0)
+  composite()
 }
 
 // 光标笔刷预览圈（屏幕坐标系，独立于笔画重绘）
