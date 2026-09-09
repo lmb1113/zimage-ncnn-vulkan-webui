@@ -1,7 +1,12 @@
-# Z-Image 工作台
+# Z-Image Workbench · Z-Image 本地绘图工作台
 
-基于 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 的本地生图管理与操作前端。
-Go 后端 + Vue3 前端，整体白色调，编译为单个可执行文件，双击即用。
+为 [Z-Image](https://github.com/Tongyi-MAI/Z-Image) 扩散模型与 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 推理引擎打造的**本地 AI 绘图管理与操作前端**——单文件分发、双击即用、开箱即用。
+
+- **全流程覆盖**：文生图 / 图生图 / 局部重绘（手绘蒙版）/ 画布扩图 / ControlNet / 超分辨率放大
+- **隐私优先**：模型推理与数据存储全程本地，无云端依赖、不上传任何数据，离线可用
+- **单文件部署**：Go 后端 + Vue 3 前端编译为单个可执行文件，前端资源内嵌，零运行时依赖
+- **GPU 加速**：基于 NCNN + Vulkan，Intel / AMD / NVIDIA 全平台显卡支持
+- **工程化体验**：任务队列持久化、SSE 实时进度、版本历史、ZIP 批量导出、简洁白色调界面
 
 > 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.8`
 
