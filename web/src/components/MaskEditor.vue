@@ -23,6 +23,7 @@ let panning = false
 let panStart = null // { x, y, panX, panY }
 let current = null
 let ro = null
+let cursorPos = null // { x, y } 画布内屏幕坐标，用于笔刷预览圈
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
@@ -121,6 +122,19 @@ function redrawMask() {
   }
   ctx.globalCompositeOperation = 'source-over'
   ctx.setTransform(1, 0, 0, 1, 0, 0)
+
+  // 笔刷预览圈：跟随光标显示实际涂抹范围
+  if (cursorPos && tool.value !== 'pan') {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.arc(cursorPos.x, cursorPos.y, Number(brushSize.value) / 2, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'
+    ctx.beginPath()
+    ctx.arc(cursorPos.x, cursorPos.y, Number(brushSize.value) / 2 + 1.5, 0, Math.PI * 2)
+    ctx.stroke()
+  }
 }
 
 function redrawAll() {
@@ -175,7 +189,12 @@ function move(e) {
     redrawAll()
     return
   }
-  if (!drawing) return
+  const r = maskCanvas.value.getBoundingClientRect()
+  cursorPos = { x: e.clientX - r.left, y: e.clientY - r.top }
+  if (!drawing) {
+    redrawMask()
+    return
+  }
   e.preventDefault()
   current.points.push(toNatural(e.clientX, e.clientY))
   redrawMask()
@@ -239,7 +258,15 @@ async function exportMask() {
   return new File([blob], 'mask.png', { type: 'image/png' })
 }
 
+function onLeave() {
+  cursorPos = null
+  redrawMask()
+}
+
 watch(() => props.src, load)
+watch(brushSize, () => {
+  if (cursorPos) redrawMask()
+})
 onMounted(() => {
   load()
   ro = new ResizeObserver(setup)
@@ -304,6 +331,7 @@ defineExpose({ hasStrokes, exportMask, clear })
         @pointermove="move"
         @pointerup="up"
         @pointercancel="up"
+        @pointerleave="onLeave"
         @wheel="onWheel"
       />
     </div>

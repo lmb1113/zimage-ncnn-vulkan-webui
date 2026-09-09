@@ -214,6 +214,7 @@ onMounted(() => {
 
         <button class="btn btn-primary block" @click="openFolder">打开所在文件夹</button>
         <button class="btn btn-ghost block" @click="reuse">复用参数重新生成</button>
+        <button class="btn btn-ghost block" @click="copyPrompt">复制提示词</button>
         <div class="link-row">
           <button class="btn btn-ghost" @click="useAsImg2img">作为图生图参考</button>
           <button class="btn btn-ghost" @click="useAsInpaint">作为重绘输入</button>
