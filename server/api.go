@@ -153,6 +153,9 @@ func (s *Server) generate(w http.ResponseWriter, r *http.Request) {
 	if req.Mode == "" {
 		req.Mode = "txt2img"
 	}
+	if req.Mode == "tile" {
+		p.TileUpscale = true // 与前端行为一致：tile 模式必带 -t
+	}
 	j := s.mgr.Submit(p, req.Mode)
 	writeJSON(w, j)
 }
