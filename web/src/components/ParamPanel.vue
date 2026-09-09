@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { store, notify, isBusy, activeJob, ensureNotifyPermission } from '../store'
 import MaskEditor from './MaskEditor.vue'
@@ -134,6 +134,11 @@ async function uploadFile(file, key) {
     // Tile 放大除外——-s 是放大目标尺寸，必须由用户指定
     if (key === 'inputImage' || (key === 'controlImage' && mode.value !== 'tile')) {
       syncInputSize(r.url)
+    }
+    // 重绘模式：上传后滚动到蒙版编辑器，确保画布可见
+    if (key === 'inputImage' && mode.value === 'inpaint') {
+      await nextTick()
+      document.querySelector('.meditor')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
     notify(`已上传 ${file.name}`, 'success')
   } catch (e) {
