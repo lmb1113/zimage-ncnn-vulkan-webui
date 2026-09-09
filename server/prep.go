@@ -115,6 +115,31 @@ func prepareOutpaint(j *Job) (int, int, int, int, error) {
 	return w, h, twA, thA, nil
 }
 
+// prepareControlNet 控制生成前置：引擎要求 -s 与控制图一致且为 16 的倍数，
+// 自动把控制图缩放到最近的 16 倍数并对齐 -s（与局部重绘同一套兜底逻辑）。
+func prepareControlNet(j *Job, uploadsDir string) (int, int, error) {
+	p := &j.Params
+	if p.ControlImage == "" {
+		return 0, 0, nil
+	}
+	w, h, err := decodeImageDims(p.ControlImage)
+	if err != nil {
+		return 0, 0, fmt.Errorf("无法读取控制图: %w", err)
+	}
+	tw, th := roundTo16(w), roundTo16(h)
+	if tw == w && th == h {
+		p.Width, p.Height = w, h
+		return w, h, nil
+	}
+	dst := filepath.Join(uploadsDir, fmt.Sprintf("pre_%s_control.png", j.ID))
+	if err := resizeImageFile(p.ControlImage, dst, tw, th, false); err != nil {
+		return w, h, fmt.Errorf("控制图缩放失败: %w", err)
+	}
+	p.ControlImage = dst
+	p.Width, p.Height = tw, th
+	return w, h, nil
+}
+
 // prepareInpaint 局部重绘前置处理：
 // 自动把输入图与遮罩缩放到「最近的 16 倍数」尺寸，并让 -s 与之对齐。
 // 输入/遮罩尺寸不一致时，以输入图为准同步缩放遮罩。

@@ -501,6 +501,19 @@ func (m *Manager) run(j *Job) {
 		}
 	}
 
+	// 控制生成：引擎要求 -s 与控制图一致且宽高为 16 的倍数，自动缩放对齐
+	if j.Mode == "controlnet" {
+		ow, oh, err := prepareControlNet(j, cfg.UploadDir)
+		if err != nil {
+			m.emit(j, "[错误] "+err.Error())
+			m.finish(j, StatusFailed, err.Error())
+			return
+		}
+		if ow != j.Params.Width || oh != j.Params.Height {
+			m.emit(j, fmt.Sprintf("[准备] 控制图 %dx%d 已自动缩放为 %dx%d（引擎要求宽高为 16 的倍数）", ow, oh, j.Params.Width, j.Params.Height))
+		}
+	}
+
 	// 局部重绘：引擎要求 -s 与输入一致且宽高为 16 的倍数，自动缩放到最近合法尺寸
 	if j.Mode == "inpaint" {
 		ow, oh, err := prepareInpaint(j, cfg.UploadDir)

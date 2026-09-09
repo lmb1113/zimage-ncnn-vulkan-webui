@@ -3,7 +3,7 @@
 基于 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 的本地生图管理与操作前端。
 Go 后端 + Vue3 前端，整体白色调，编译为单个可执行文件，双击即用。
 
-> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.4`
+> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.5`
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -250,6 +250,12 @@ WDDM 限制 Vulkan 应用只能用一半系统内存，需满足「一半内存 
 - 重绘管线参考：[scraed/LanPaint](https://github.com/scraed/LanPaint)
 
 ## 更新日志
+
+### v0.3.5
+
+- 修复控制生成（ControlNet）的尺寸兼容：引擎要求 `-s` 与控制图一致且为 16 的倍数，
+  服务端自动把控制图缩放到最近 16 倍数并对齐 `-s`（与局部重绘/扩图同一套兜底）
+- 失败任务一键重试；灯箱删除按钮；蒙版画布增量绘制与光标预览圈
 
 ### v0.3.4
 
