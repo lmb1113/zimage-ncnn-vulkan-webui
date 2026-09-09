@@ -3,7 +3,7 @@
 基于 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 的本地生图管理与操作前端。
 Go 后端 + Vue3 前端，整体白色调，编译为单个可执行文件，双击即用。
 
-> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.3`
+> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.4`
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -250,6 +250,12 @@ WDDM 限制 Vulkan 应用只能用一半系统内存，需满足「一半内存 
 - 重绘管线参考：[scraed/LanPaint](https://github.com/scraed/LanPaint)
 
 ## 更新日志
+
+### v0.3.4
+
+- 修复画布扩图：引擎要求 `-s` 为「原图 + 边距」的扩展画布尺寸（且为 16 倍数），
+  服务端现在自动计算并对齐（多出部分计入右/下边距），控制台显示 `[准备] 扩图画布` 日志
+- 扩图模式界面的「扩展后 W×H」实时显示与服务端行为一致
 
 ### v0.3.3
 

@@ -488,6 +488,19 @@ func (t *progTracker) parseProgress(line string) (int, bool) {
 func (m *Manager) run(j *Job) {
 	cfg := GetConfig()
 
+	// 扩图：引擎要求 -s 为「原图 + 边距」的扩展画布尺寸（且为 16 倍数），自动计算
+	if j.Mode == "outpaint" {
+		iw, ih, fw, fh, err := prepareOutpaint(j)
+		if err != nil {
+			m.emit(j, "[错误] "+err.Error())
+			m.finish(j, StatusFailed, err.Error())
+			return
+		}
+		if fw != iw || fh != ih {
+			m.emit(j, fmt.Sprintf("[准备] 扩图画布 %dx%d → %dx%d（-s 需为扩展后尺寸，已自动对齐 16 倍数）", iw, ih, fw, fh))
+		}
+	}
+
 	// 局部重绘：引擎要求 -s 与输入一致且宽高为 16 的倍数，自动缩放到最近合法尺寸
 	if j.Mode == "inpaint" {
 		ow, oh, err := prepareInpaint(j, cfg.UploadDir)

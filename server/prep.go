@@ -7,6 +7,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"golang.org/x/image/draw"
 )
@@ -74,6 +76,43 @@ func resizeImageFile(srcPath, dstPath string, w, h int, mask bool) error {
 	}
 	out.Close()
 	return os.Rename(tmpPath, dstPath)
+}
+
+// parseOutpaintMargins 解析 -x 左,上,右,下 边距，非法项按 0 处理。
+func parseOutpaintMargins(s string) (l, t, r, b int) {
+	parts := strings.Split(s, ",")
+	get := func(i int) int {
+		if i >= len(parts) {
+			return 0
+		}
+		v, err := strconv.Atoi(strings.TrimSpace(parts[i]))
+		if err != nil || v < 0 {
+			return 0
+		}
+		return v
+	}
+	return get(0), get(1), get(2), get(3)
+}
+
+// prepareOutpaint 扩图前置处理。实测引擎要求：-s 必须为「原图 + 边距」的扩展画布尺寸，
+// 且宽高为 16 的倍数。自动计算并对齐（多出的部分计入右/下边距）。
+func prepareOutpaint(j *Job) (int, int, int, int, error) {
+	p := &j.Params
+	if p.InputImage == "" || strings.TrimSpace(p.Outpaint) == "" {
+		return 0, 0, 0, 0, fmt.Errorf("扩图需要输入图与扩展边距")
+	}
+	w, h, err := decodeImageDims(p.InputImage)
+	if err != nil {
+		return 0, 0, 0, 0, fmt.Errorf("无法读取输入图: %w", err)
+	}
+	l, t, r, b := parseOutpaintMargins(p.Outpaint)
+	tw, th := w+l+r, h+t+b
+	twA, thA := roundTo16(tw), roundTo16(th)
+	r += twA - tw
+	b += thA - th
+	p.Outpaint = fmt.Sprintf("%d,%d,%d,%d", l, t, r, b)
+	p.Width, p.Height = twA, thA
+	return w, h, twA, thA, nil
 }
 
 // prepareInpaint 局部重绘前置处理：
