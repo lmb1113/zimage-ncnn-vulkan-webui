@@ -23,6 +23,21 @@ export default {
       body: JSON.stringify(config),
     }),
 
+  engines: () => req('/api/engines'),
+  saveEngine: (profile) =>
+    req('/api/engines', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile),
+    }),
+  deleteEngine: (id) => req(`/api/engines?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  selectEngine: (id) =>
+    req('/api/engines/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }),
+
   generate: (mode, params) =>
     req('/api/generate', {
       method: 'POST',

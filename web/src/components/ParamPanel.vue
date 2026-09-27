@@ -4,14 +4,7 @@ import api from '../api'
 import { store, notify, isBusy, activeJob, ensureNotifyPermission } from '../store'
 import MaskEditor from './MaskEditor.vue'
 
-const modes = [
-  { key: 'txt2img', label: '文生图' },
-  { key: 'img2img', label: '图生图' },
-  { key: 'inpaint', label: '局部重绘' },
-  { key: 'outpaint', label: '画布扩图' },
-  { key: 'controlnet', label: '控制生成' },
-  { key: 'tile', label: '图片放大' },
-]
+// 模式列表由当前引擎档案决定（见下方 modes 计算属性）
 
 const presets = [
   { label: '1024×1024', w: 1024, h: 1024 },
@@ -36,11 +29,84 @@ const params = reactive({
   outpaint: '128,128,128,128',
   controlImage: '',
   controlScale: 1.0,
+  guidance: 1.0, // -w 引导系数（Qwen-Image 等引擎）
+  refImages: [], // 多参考图路径（Qwen-Image 编辑）
   tileUpscale: false,
 })
 
 const mode = ref('txt2img')
 const previews = reactive({})
+
+// ---------- 引擎档案驱动 ----------
+// 不同引擎支持的模式与参数语义不同（如 Qwen-Image 只有文生图与图像编辑，
+// 且 -w 是引导系数而非控制强度），界面据此动态渲染。
+const engines = computed(() => (store.system && store.system.config && store.system.config.engines) || [])
+const engineId = computed(() => (store.system && store.system.config && store.system.config.engineId) || '')
+const engine = computed(
+  () => engines.value.find((e) => e.id === engineId.value) || engines.value[0] || null
+)
+const modes = computed(() => {
+  const e = engine.value
+  if (e && e.modes && e.modes.length) {
+    return e.modes.map((m) => ({ key: m.key, label: m.label || m.key }))
+  }
+  // 引擎信息尚未加载时的兜底（Z-Image 全量模式）
+  return [
+    { key: 'txt2img', label: '文生图' },
+    { key: 'img2img', label: '图生图' },
+    { key: 'inpaint', label: '局部重绘' },
+    { key: 'outpaint', label: '画布扩图' },
+    { key: 'controlnet', label: '控制生成' },
+    { key: 'tile', label: '图片放大' },
+  ]
+})
+
+// 当前模式的规范（决定要显示哪些输入位）
+const ms = computed(() => {
+  const e = engine.value
+  if (e && e.modes) return e.modes.find((m) => m.key === mode.value) || null
+  return null
+})
+// 引擎档案缺失时按模式名兜底，保证旧配置/旧服务端也能用
+const needsRef = computed(() =>
+  ms.value ? !!ms.value.needsRef : ['img2img', 'inpaint', 'outpaint'].includes(mode.value)
+)
+const multiRef = computed(() => (ms.value ? !!ms.value.multiRef : false))
+const needsMask = computed(() =>
+  ms.value ? !!ms.value.needsMask : mode.value === 'inpaint'
+)
+const needsMargin = computed(() =>
+  ms.value ? !!ms.value.needsMargin : mode.value === 'outpaint'
+)
+const needsControl = computed(() =>
+  ms.value ? !!ms.value.needsControl : ['controlnet', 'tile', 'img2img'].includes(mode.value)
+)
+const isTile = computed(() => (ms.value ? !!ms.value.tile : mode.value === 'tile'))
+// -w 的语义随引擎变化：控制强度 或 引导系数（CFG）
+const guidanceIsCfg = computed(() => (engine.value ? engine.value.guidanceRole === 'cfg' : false))
+// 参考图走 -c（控制图）还是 -i（输入图），由模式规范决定
+const refKey = computed(() => (needsControl.value ? 'controlImage' : 'inputImage'))
+const refPlaceholder = computed(() => {
+  if (isTile.value) return '上传低分辨率图（放大到目标尺寸）'
+  if (mode.value === 'img2img') return '上传参考图（可拖入 / Ctrl+V）'
+  if (mode.value === 'edit') return '上传参考图（可拖入 / Ctrl+V）'
+  return '上传控制图（姿态/线稿/灰度）'
+})
+const guidanceLabel = computed(() => {
+  if (guidanceIsCfg.value) return '引导系数 CFG'
+  return mode.value === 'img2img' ? '相似强度' : '控制强度'
+})
+const guidanceValue = computed(() =>
+  guidanceIsCfg.value ? params.guidance : params.controlScale
+)
+
+// 切换引擎后，若当前模式不被新引擎支持则自动切到其第一个模式
+watch(modes, (list) => {
+  if (list.length && !list.some((m) => m.key === mode.value)) {
+    mode.value = list[0].key
+  }
+})
+
 const showAdvanced = ref(false)
 const maskEditor = ref(null)
 const inputDims = reactive({ w: 0, h: 0 })
@@ -187,9 +253,9 @@ function onPaste(e) {
   const img = Array.from(files).find((f) => f.type.startsWith('image/'))
   if (!img) return
   let key = ''
-  if (mode.value === 'inpaint') key = previews.inputImage ? '' : 'inputImage'
-  else if (mode.value === 'outpaint') key = 'inputImage'
-  else if (mode.value === 'img2img' || mode.value === 'controlnet' || mode.value === 'tile') key = 'controlImage'
+  if (needsMask.value) key = previews.inputImage ? '' : 'inputImage'
+  else if (needsMargin.value) key = 'inputImage'
+  else if (needsControl.value || needsRef.value) key = refKey.value
   if (!key) {
     if (mode.value !== 'txt2img') notify('该输入位已有图片', 'info')
     return
@@ -226,7 +292,10 @@ async function submit() {
     }
   }
   const payload = { ...params }
-  if (mode.value === 'tile') payload.tileUpscale = true
+  if (isTile.value) payload.tileUpscale = true
+  // -w 语义分流：CFG 引擎只传引导系数，控制类引擎只传控制强度，避免互相干扰
+  if (guidanceIsCfg.value) payload.controlScale = 0
+  else payload.guidance = 0
   try {
     ensureNotifyPermission() // 首次提交时征询通知权限，长任务结束后可在后台收到提醒
     // 图生图 = ControlNet 路线：引擎无原生 img2img，用 -c 参考图实现
@@ -339,7 +408,7 @@ function reset() {
     </div>
 
     <!-- 模式相关输入 -->
-    <div v-if="mode === 'inpaint'" class="group uploads">
+    <div v-if="needsMask" class="group uploads">
       <button
         class="uploader"
         title="点击选择或拖入图片"
@@ -368,7 +437,7 @@ function reset() {
       </button>
     </div>
 
-    <div v-else-if="mode === 'outpaint'" class="group">
+    <div v-else-if="needsMargin" class="group">
       <button
         class="uploader"
         title="点击选择或拖入图片"
@@ -386,30 +455,31 @@ function reset() {
       <input v-model="params.outpaint" placeholder="128,128,128,128" />
     </div>
 
-    <div v-else-if="mode === 'controlnet' || mode === 'tile' || mode === 'img2img'" class="group">
+    <div v-else-if="needsControl || needsRef" class="group">
       <button
         class="uploader"
         title="点击选择或拖入图片"
-        @click="pickFile('controlImage')"
+        @click="pickFile(refKey)"
         @dragover.prevent
-        @drop.prevent="onDrop($event, 'controlImage')"
+        @drop.prevent="onDrop($event, refKey)"
       >
-        <img v-if="previews.controlImage" :src="previews.controlImage" alt="" />
-        <span v-else>{{
-          mode === 'tile'
-            ? '上传低分辨率图（放大到目标尺寸）'
-            : mode === 'img2img'
-              ? '上传参考图（可拖入 / Ctrl+V）'
-              : '上传控制图（姿态/线稿/灰度）'
-        }}</span>
+        <img v-if="previews[refKey]" :src="previews[refKey]" alt="" />
+        <span v-else>{{ refPlaceholder }}</span>
       </button>
       <div class="row-between">
-        <span class="field-label">
-          {{ mode === 'img2img' ? '相似强度' : '控制强度' }}
-        </span>
-        <span class="value">{{ params.controlScale.toFixed(2) }}</span>
+        <span class="field-label">{{ guidanceLabel }}</span>
+        <span class="value">{{ guidanceValue.toFixed(2) }}</span>
       </div>
       <input
+        v-if="guidanceIsCfg"
+        v-model.number="params.guidance"
+        type="range"
+        min="1"
+        max="10"
+        step="0.1"
+      />
+      <input
+        v-else
         v-model.number="params.controlScale"
         type="range"
         min="0"

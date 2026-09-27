@@ -48,6 +48,31 @@ const models = computed(() => (store.system ? store.system.models || [] : []))
 const foundModels = computed(() => models.value.filter((m) => m.found))
 const exeFound = computed(() => !!(store.system && store.system.exeFound))
 
+// ---------- 引擎档案（多模型支持） ----------
+const engines = computed(() => (store.system && store.system.config && store.system.config.engines) || [])
+const engineId = computed(() => (store.system && store.system.config && store.system.config.engineId) || '')
+
+async function selectEngine(id) {
+  if (id === engineId.value) return
+  try {
+    await api.selectEngine(id)
+    await refreshSystem()
+    notify('已切换引擎', 'success')
+  } catch (e) {
+    notify(e.message, 'error')
+  }
+}
+
+async function saveEngine(e) {
+  try {
+    await api.saveEngine(e)
+    await refreshSystem()
+    notify('引擎设置已保存', 'success')
+  } catch (err) {
+    notify(err.message, 'error')
+  }
+}
+
 async function save() {
   try {
     await api.saveConfig({ ...form, gpuId: Number(form.gpuId), port: Number(form.port) })
@@ -81,9 +106,60 @@ async function clearUploads() {
   <div class="view">
     <div class="col">
       <section class="card block-card">
+        <h3>模型引擎</h3>
+        <p class="hint">
+          工作台可挂载多个 ncnn 引擎；切换后生成页的模式与参数会自动适配该引擎的能力。
+        </p>
+        <div class="engine-list">
+          <div
+            v-for="e in engines"
+            :key="e.id"
+            class="engine-card"
+            :class="{ on: e.id === engineId }"
+          >
+            <div class="engine-head">
+              <div>
+                <strong>{{ e.name }}</strong>
+                <span class="engine-id">{{ e.id }}</span>
+              </div>
+              <button
+                class="btn btn-sm"
+                :class="e.id === engineId ? 'btn-ghost' : 'btn-primary'"
+                @click="selectEngine(e.id)"
+              >
+                {{ e.id === engineId ? '当前使用' : '切换到此引擎' }}
+              </button>
+            </div>
+            <div class="engine-modes">
+              <span v-for="m in e.modes" :key="m.key" class="mode-chip">{{ m.label }}</span>
+            </div>
+            <label>
+              <span>
+                可执行文件
+                <em :class="e.exeFound ? 'ok' : 'bad'">{{ e.exeFound ? '已找到' : '未找到' }}</em>
+              </span>
+              <input v-model="e.exePath" placeholder="引擎可执行文件路径" />
+            </label>
+            <label>
+              <span>
+                模型目录（-m）
+                <em :class="e.modelFound ? 'ok' : 'bad'">
+                  {{ e.modelFound ? '已找到' : '未找到' }}
+                </em>
+              </span>
+              <input v-model="e.modelPath" placeholder="模型目录路径" />
+            </label>
+            <div class="engine-actions">
+              <button class="btn btn-sm btn-ghost" @click="saveEngine(e)">保存此引擎设置</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card block-card">
         <h3>引擎与路径</h3>
         <p class="hint">
-          工作目录需要包含 <code>z-image-turbo</code> 模型文件夹；可执行文件通常就在同级目录。
+          以下为当前引擎的工作路径（切换引擎后随之更新）。
         </p>
 
         <label>
@@ -337,5 +413,62 @@ code {
 }
 .dot.ok {
   background: var(--success);
+}
+
+.engine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.engine-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.engine-card.on {
+  border-color: var(--ink);
+  background: var(--tint);
+}
+.engine-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.engine-id {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.engine-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mode-chip {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.engine-card label em {
+  font-style: normal;
+  font-size: 12px;
+  margin-left: 6px;
+}
+.engine-card em.ok {
+  color: var(--success);
+}
+.engine-card em.bad {
+  color: #e5484d;
+}
+.engine-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

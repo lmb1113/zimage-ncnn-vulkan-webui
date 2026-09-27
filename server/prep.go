@@ -21,10 +21,18 @@ import (
 
 // roundTo16 四舍五入到最近的 16 倍数，最小 256（过小尺寸重绘无意义）。
 func roundTo16(v int) int {
+	return roundToN(v, 16)
+}
+
+// roundToN 把尺寸对齐到指定倍数（引擎要求 16 或 32，视模式而定）。
+func roundToN(v, unit int) int {
+	if unit <= 0 {
+		unit = 16
+	}
 	if v < 256 {
 		return 256
 	}
-	return int(math.Round(float64(v)/16)) * 16
+	return int(math.Round(float64(v)/float64(unit))) * unit
 }
 
 // decodeImageDims 读取图片尺寸（仅解析文件头）。

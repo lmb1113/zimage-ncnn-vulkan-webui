@@ -28,12 +28,14 @@ type Params struct {
 	Batch        int     `json:"batch"`  // -b
 	ModelPath    string  `json:"modelPath"`
 	GPUID        *int    `json:"gpuId"` // nil 自动 / -1 CPU / >=0 指定设备；指针用于区分「未设置」与显式 GPU 0
-	InputImage   string  `json:"inputImage"`   // -i
+	InputImage   string  `json:"inputImage"`   // -i（单图输入）
 	MaskImage    string  `json:"maskImage"`    // -k
 	Outpaint     string  `json:"outpaint"`     // -x l,t,r,b
 	ControlImage string  `json:"controlImage"` // -c
-	ControlScale float64 `json:"controlScale"` // -w
+	ControlScale float64 `json:"controlScale"` // -w（控制强度，z-image）
+	Guidance     float64 `json:"guidance"`     // -w（引导系数 CFG，qwen-image）
 	TileUpscale  bool    `json:"tileUpscale"`  // -t
+	RefImages    []string `json:"refImages"`   // -i 重复（多参考图，qwen-image 编辑）
 }
 
 // Job 是一次生成任务。
@@ -354,69 +356,11 @@ func (m *Manager) worker() {
 	}
 }
 
-// BuildArgs 把参数翻译成 zimage-ncnn-vulkan 的命令行。
+// BuildArgs 使用当前引擎档案把任务参数翻译成命令行。
+// 各引擎的参数语义差异（如 -w 含义、多参考图）由档案处理。
 func BuildArgs(j *Job, outPath string) []string {
-	p := j.Params
-	a := []string{}
-
-	prompt := strings.TrimSpace(p.Prompt)
-	if prompt == "" {
-		prompt = "rand"
-	}
-	a = append(a, "-p", prompt)
-
-	if strings.TrimSpace(p.Negative) != "" {
-		a = append(a, "-n", strings.TrimSpace(p.Negative))
-	}
-	a = append(a, "-o", outPath)
-	// 扩图：引擎按「原图 + -x 边距」自行推导画布，README 示例也不传 -s，
-	// 传入与扩展后尺寸不符的 -s 会导致引擎崩溃，因此该模式跳过 -s。
-	if p.Width > 0 && p.Height > 0 && j.Mode != "outpaint" {
-		a = append(a, "-s", fmt.Sprintf("%d,%d", p.Width, p.Height))
-	}
-	if p.Steps > 0 {
-		a = append(a, "-l", strconv.Itoa(p.Steps))
-	}
-	if p.Seed >= 0 {
-		a = append(a, "-r", strconv.FormatInt(p.Seed, 10))
-	}
-	if strings.TrimSpace(p.ModelPath) != "" {
-		a = append(a, "-m", strings.TrimSpace(p.ModelPath))
-	}
-	if p.GPUID != nil && *p.GPUID != -2 {
-		a = append(a, "-g", strconv.Itoa(*p.GPUID))
-	}
-	if p.Batch > 1 {
-		a = append(a, "-b", strconv.Itoa(p.Batch))
-	}
-
-	switch j.Mode {
-	case "inpaint":
-		if p.InputImage != "" {
-			a = append(a, "-i", p.InputImage)
-		}
-		if p.MaskImage != "" {
-			a = append(a, "-k", p.MaskImage)
-		}
-	case "outpaint":
-		if p.InputImage != "" {
-			a = append(a, "-i", p.InputImage)
-		}
-		if strings.TrimSpace(p.Outpaint) != "" {
-			a = append(a, "-x", strings.TrimSpace(p.Outpaint))
-		}
-	case "controlnet", "tile":
-		if p.ControlImage != "" {
-			a = append(a, "-c", p.ControlImage)
-		}
-		if p.ControlScale > 0 {
-			a = append(a, "-w", fmt.Sprintf("%.2f", p.ControlScale))
-		}
-		if j.Mode == "tile" {
-			a = append(a, "-t")
-		}
-	}
-	return a
+	e := CurrentEngine()
+	return e.BuildArgs(j, outPath)
 }
 
 var (
@@ -527,20 +471,25 @@ func (m *Manager) run(j *Job) {
 		}
 	}
 
-	// 文生图/图片放大：-s 为用户输入的自由尺寸，统一对齐到 16 的倍数
-	// （其余模式的前置处理已保证对齐，此处为幂等兜底）
-	j.Params.Width, j.Params.Height = roundTo16(j.Params.Width), roundTo16(j.Params.Height)
+	// 自由尺寸模式：统一对齐到当前引擎/模式要求的倍数（16 或 32），幂等兜底
+	engine := CurrentEngine()
+	unit := engine.SizeUnitFor(j.Mode)
+	j.Params.Width, j.Params.Height = roundToN(j.Params.Width, unit), roundToN(j.Params.Height, unit)
 
+	exePath := engine.ExePath
+	if exePath == "" {
+		exePath = cfg.ExePath
+	}
 	outPath := filepath.Join(cfg.OutputDir, j.ID+".png")
-	args := BuildArgs(j, outPath)
-	j.Command = quoteCommand(cfg.ExePath, args)
+	args := engine.BuildArgs(j, outPath)
+	j.Command = quoteCommand(exePath, args)
 
 	m.setRunning(j)
 	m.emit(j, "$ "+j.Command)
 
-	if _, err := os.Stat(cfg.ExePath); err != nil {
-		m.emit(j, "[错误] 找不到可执行文件: "+cfg.ExePath)
-		m.finish(j, StatusFailed, "找不到可执行文件: "+cfg.ExePath)
+	if _, err := os.Stat(exePath); err != nil {
+		m.emit(j, "[错误] 找不到可执行文件: "+exePath)
+		m.finish(j, StatusFailed, "找不到可执行文件: "+exePath)
 		return
 	}
 
@@ -549,7 +498,7 @@ func (m *Manager) run(j *Job) {
 	m.cancel = cancel
 	m.mu.Unlock()
 
-	cmd := exec.CommandContext(ctx, cfg.ExePath, args...)
+	cmd := exec.CommandContext(ctx, exePath, args...)
 	cmd.Dir = cfg.WorkDir
 	cmd.Env = append(os.Environ(), "NCNN_VULKAN=1")
 

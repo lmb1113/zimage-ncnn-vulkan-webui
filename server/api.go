@@ -49,6 +49,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/config", s.postConfig)
 	mux.HandleFunc("GET /api/system", s.system)
 
+	// 引擎档案（多模型扩展）：列表 / 增改 / 删除 / 切换当前引擎
+	mux.HandleFunc("GET /api/engines", s.engines)
+	mux.HandleFunc("POST /api/engines", s.engines)
+	mux.HandleFunc("DELETE /api/engines", s.engines)
+	mux.HandleFunc("POST /api/engines/select", s.selectEngine)
+
 	mux.HandleFunc("POST /api/generate", s.generate)
 	mux.HandleFunc("GET /api/jobs", s.listJobs)
 	mux.HandleFunc("GET /api/jobs/{id}", s.getJob)
@@ -121,6 +127,124 @@ func (s *Server) postConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) system(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, Inspect())
+}
+
+// engines 引擎档案的读写：GET 列表、POST 新增或更新、DELETE 删除（内置不可删）。
+func (s *Server) engines(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		c := GetConfig()
+		writeJSON(w, map[string]any{"engines": inspectEngines(c), "current": c.EngineID})
+
+	case http.MethodPost:
+		var p EngineProfile
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if strings.TrimSpace(p.ID) == "" {
+			writeErr(w, http.StatusBadRequest, "缺少引擎 id")
+			return
+		}
+		c := GetConfig()
+		if e := findEngine(c.Engines, p.ID); e != nil {
+			*e = p // 更新已有档案
+		} else {
+			if p.Name == "" {
+				p.Name = p.ID
+			}
+			if len(p.Modes) == 0 {
+				p.Modes = builtinProfiles()[0].Modes
+			}
+			if p.SizeUnit <= 0 {
+				p.SizeUnit = 16
+			}
+			if p.MaxRefs <= 0 {
+				p.MaxRefs = 1
+			}
+			c.Engines = append(c.Engines, p)
+		}
+		if err := SaveConfig(c); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "engines": inspectEngines(GetConfig()), "current": GetConfig().EngineID})
+
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			writeErr(w, http.StatusBadRequest, "缺少引擎 id")
+			return
+		}
+		c := GetConfig()
+		e := findEngine(c.Engines, id)
+		if e == nil {
+			writeErr(w, http.StatusNotFound, "引擎不存在")
+			return
+		}
+		if e.Builtin {
+			writeErr(w, http.StatusBadRequest, "内置引擎不可删除，可修改其路径")
+			return
+		}
+		kept := make([]EngineProfile, 0, len(c.Engines))
+		for _, it := range c.Engines {
+			if it.ID != id {
+				kept = append(kept, it)
+			}
+		}
+		c.Engines = kept
+		if c.EngineID == id && len(c.Engines) > 0 {
+			c.EngineID = c.Engines[0].ID
+		}
+		if err := SaveConfig(c); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "engines": inspectEngines(GetConfig()), "current": GetConfig().EngineID})
+
+	default:
+		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+// selectEngine 切换当前使用的引擎。
+func (s *Server) selectEngine(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	c := GetConfig()
+	if findEngine(c.Engines, req.ID) == nil {
+		writeErr(w, http.StatusNotFound, "引擎不存在")
+		return
+	}
+	c.EngineID = req.ID
+	if err := SaveConfig(c); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "current": c.EngineID})
+}
+
+// inspectEngines 返回带路径探测结果的引擎列表。
+func inspectEngines(c Config) []EngineProfile {
+	out := make([]EngineProfile, len(c.Engines))
+	copy(out, c.Engines)
+	for i := range out {
+		e := &out[i]
+		e.ExeFound = fileExists(e.ExePath)
+		if e.ModelPath != "" {
+			p := e.ModelPath
+			if !filepath.IsAbs(p) {
+				p = filepath.Join(c.WorkDir, p) // 模型名相对工作目录
+			}
+			e.ModelFound = dirExists(p) || fileExists(p)
+		}
+	}
+	return out
 }
 
 type generateRequest struct {

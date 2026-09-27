@@ -3,12 +3,14 @@
 为 [Z-Image](https://github.com/Tongyi-MAI/Z-Image) 扩散模型与 [zimage-ncnn-vulkan](https://github.com/nihui/zimage-ncnn-vulkan) 推理引擎打造的**本地 AI 绘图管理与操作前端**——单文件分发、双击即用、开箱即用。
 
 - **全流程覆盖**：文生图 / 图生图 / 局部重绘（手绘蒙版）/ 画布扩图 / ControlNet / 超分辨率放大
+- **多引擎可换**：内置 Z-Image Turbo 与 Qwen-Image 2.1 两款 ncnn 引擎，可自由切换；
+  模式列表与参数（控制强度 / 引导系数等）随引擎自动适配，新增模型只需追加一条引擎档案
 - **隐私优先**：模型推理与数据存储全程本地，无云端依赖、不上传任何数据，离线可用
 - **单文件部署**：Go 后端 + Vue 3 前端编译为单个可执行文件，前端资源内嵌，零运行时依赖
 - **GPU 加速**：基于 NCNN + Vulkan，Intel / AMD / NVIDIA 全平台显卡支持
 - **工程化体验**：任务队列持久化、SSE 实时进度、版本历史、ZIP 批量导出、简洁白色调界面
 
-> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.3.8`
+> 默认地址：`http://127.0.0.1:19777`（启动后自动打开浏览器） · 当前版本：`v0.4.0`
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -255,6 +257,15 @@ WDDM 限制 Vulkan 应用只能用一半系统内存，需满足「一半内存 
 - 重绘管线参考：[scraed/LanPaint](https://github.com/scraed/LanPaint)
 
 ## 更新日志
+
+### v0.4.0
+
+- **多引擎架构**：引入引擎档案（Engine Profile），内置 Z-Image Turbo 与 Qwen-Image 2.1，
+  设置页可切换引擎、编辑引擎与模型路径，并自动探测本机已安装的引擎与模型
+- 模式列表与参数按引擎能力动态渲染（Qwen-Image 仅文生图 / 图像编辑，
+  `-w` 为引导系数 CFG；Z-Image 为控制强度）
+- 尺寸对齐粒度按引擎与模式区分（Qwen-Image 图像编辑要求 32 倍数）
+- 新增引擎管理 API：`/api/engines`（列表 / 增改 / 删除 / 切换）
 
 ### v0.3.8
 
